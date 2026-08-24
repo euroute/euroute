@@ -1,0 +1,1 @@
+REVOKE SELECT, INSERT, UPDATE, DELETE ON public.trip_segment_bookings FROM anon;
