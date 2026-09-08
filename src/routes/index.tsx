@@ -9,21 +9,29 @@ import { useI18n } from "@/lib/i18n";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Euroute – planera tågresor i hela Europa" },
+      { title: "Euroute – planera tågresor genom Europa" },
       {
         name: "description",
         content:
-          "Sök tågresor över landsgränser i ett svep, se alla byten och bolag, och få resan rangordnad efter dina preferenser.",
+          "Planera hela din tågresa genom Europa på ett ställe. Jämför resvägar över olika länder och tågbolag och hitta rätt ställe för att boka varje etapp.",
       },
-      { property: "og:title", content: "Euroute – planera tågresor i hela Europa" },
+      { property: "og:title", content: "Euroute – planera tågresor genom Europa" },
       {
         property: "og:description",
         content:
-          "En sökning ger dig hela resan – från SJ till DSB och DB – med bokningslänkar för varje etapp.",
+          "Planera hela din tågresa genom Europa på ett ställe. Jämför resvägar över olika länder och tågbolag och hitta rätt ställe för att boka varje etapp.",
       },
-      { property: "og:url", content: "https://euroute.lovable.app/" },
+      { property: "og:url", content: "https://euroute.app/" },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+      { name: "twitter:title", content: "Euroute – planera tågresor genom Europa" },
+      {
+        name: "twitter:description",
+        content:
+          "Planera hela din tågresa genom Europa på ett ställe. Jämför resvägar över olika länder och tågbolag och hitta rätt ställe för att boka varje etapp.",
+      },
     ],
-    links: [{ rel: "canonical", href: "https://euroute.lovable.app/" }],
+    links: [{ rel: "canonical", href: "https://euroute.app/" }],
   }),
   component: Index,
 });

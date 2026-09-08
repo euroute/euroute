@@ -3,8 +3,9 @@ import { ArrowUpRight, Clock, MoonStar, Repeat, TriangleAlert } from "lucide-rea
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConnectionBlock } from "@/components/ConnectionBadge";
-import { bookingTargetForLeg, operatorTargetForLeg, retailerTargetForLeg } from "@/lib/operators";
+import { bookingActionLabelKey, bookingPlanForLeg } from "@/lib/booking-actions";
 import { useI18n } from "@/lib/i18n";
+import { journeyHasNightTrain } from "@/lib/night-train";
 import { stationLabel } from "@/lib/station-name";
 import { evaluateConnections, type Connection } from "@/lib/journey-intelligence";
 import {
@@ -16,6 +17,12 @@ import {
   transferMinutes,
   type Journey,
 } from "@/lib/journey";
+import {
+  journeyArrivalZone,
+  journeyDepartureZone,
+  legArrivalZone,
+  legDepartureZone,
+} from "@/lib/station-timezone";
 
 type Props = {
   journey: Journey;
@@ -36,9 +43,14 @@ export function JourneyCard({
   const { lang, t } = useI18n();
   const transit = journey.legs.filter((leg) => leg.kind !== "walk");
   const gaps = transferMinutes(journey);
-  const offset = dayOffset(journey.departure, journey.arrival);
+  const depZone = journeyDepartureZone(journey);
+  const arrZone = journeyArrivalZone(journey);
+  const offset = dayOffset(journey.departure, journey.arrival, depZone, arrZone);
   const tightIndex = gaps.findIndex((gap) => gap < minTransferMinutes);
   const evaluated = connections ?? evaluateConnections(journey, minTransferMinutes);
+  // Derived from the actual rail legs, so legacy snapshots with a stale
+  // hasNightLeg flag do not keep an incorrect badge.
+  const hasNightTrain = journeyHasNightTrain(journey);
 
   return (
     <article
@@ -49,10 +61,10 @@ export function JourneyCard({
     >
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 bg-secondary/40 px-4 py-3">
         <div className="flex items-baseline gap-3">
-          <span className="clock text-2xl font-semibold">{formatClock(journey.departure)}</span>
+          <span className="clock text-2xl font-semibold">{formatClock(journey.departure, depZone)}</span>
           <span className="text-muted-foreground">→</span>
           <span className="clock text-2xl font-semibold">
-            {formatClock(journey.arrival)}
+            {formatClock(journey.arrival, arrZone)}
             {offset > 0 ? <sup className="ml-0.5 text-xs">+{offset}d</sup> : null}
           </span>
         </div>
@@ -67,7 +79,7 @@ export function JourneyCard({
               ? t("journey.direct")
               : t("journey.transfersN", { n: journey.transfers })}
           </Badge>
-          {journey.hasNightLeg ? (
+          {hasNightTrain ? (
             <Badge className="gap-1 bg-primary text-primary-foreground">
               <MoonStar className="size-3.5" />
               {t("journey.night")}
@@ -88,12 +100,11 @@ export function JourneyCard({
 
       <div className="px-4 py-4">
         <p className="mb-3 text-xs tracking-wide text-muted-foreground uppercase">
-          {formatDay(journey.departure, lang)}
+          {formatDay(journey.departure, lang, depZone)}
         </p>
         <ol className="space-y-4">
           {transit.map((leg, index) => {
-            const booking = bookingTargetForLeg(leg);
-            const operatorTarget = operatorTargetForLeg(leg);
+            const plan = bookingPlanForLeg(leg);
             const connection = index > 0 ? evaluated[index - 1] : undefined;
             return (
               <li key={`${leg.departure}-${leg.fromName}-${index}`}>
@@ -107,7 +118,7 @@ export function JourneyCard({
                   <div className="flex-1">
                     <div className="flex flex-wrap items-baseline justify-between gap-2">
                       <p className="font-medium">
-                        <span className="clock mr-2 text-sm">{formatClock(leg.departure)}</span>
+                        <span className="clock mr-2 text-sm">{formatClock(leg.departure, legDepartureZone(leg))}</span>
                         {stationLabel(leg.fromName)}
                       </p>
                       <span className="text-xs text-muted-foreground">
@@ -121,36 +132,30 @@ export function JourneyCard({
                       {leg.headsign ? ` · ${t("journey.towards", { headsign: leg.headsign })}` : ""}
                     </p>
                     <p className="mt-1 font-medium">
-                      <span className="clock mr-2 text-sm">{formatClock(leg.arrival)}</span>
+                      <span className="clock mr-2 text-sm">{formatClock(leg.arrival, legArrivalZone(leg))}</span>
                       {stationLabel(leg.toName)}
                     </p>
                     <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <Button asChild variant="outline" size="sm" className="gap-1.5">
-                        <a href={booking.url} target="_blank" rel="noopener noreferrer">
-                          {t("journey.bookLeg")}
-                          <ArrowUpRight className="size-3.5" />
-                        </a>
-                      </Button>
-                      {operatorTarget ? (
-                        <a
-                          href={operatorTarget.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
-                        >
-                          {t("journey.bookWith", {
-                            operator: operatorTarget.label || t("journey.operatorFallback"),
-                          })}
-                        </a>
-                      ) : null}
-                      <a
-                        href={retailerTargetForLeg(leg).url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
-                      >
-                        Trainline
-                      </a>
+                      {plan.kind === "local" ? (
+                        <p className="text-xs text-muted-foreground">{t("booking.local")}</p>
+                      ) : plan.actions.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">{t("booking.none")}</p>
+                      ) : (
+                        plan.actions.map((action, actionIndex) => (
+                          <Button
+                            key={`${action.target}-${action.url}`}
+                            asChild
+                            variant={actionIndex === 0 ? "outline" : "ghost"}
+                            size="sm"
+                            className="gap-1.5"
+                          >
+                            <a href={action.url} target="_blank" rel="noopener noreferrer">
+                              {t(bookingActionLabelKey(action), { operator: action.label })}
+                              <ArrowUpRight className="size-3.5" />
+                            </a>
+                          </Button>
+                        ))
+                      )}
                     </div>
                   </div>
                 </div>

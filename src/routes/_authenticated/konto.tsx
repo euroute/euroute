@@ -18,6 +18,10 @@ export const Route = createFileRoute("/_authenticated/konto")({
     meta: [
       { title: "Mitt konto – Euroute" },
       { name: "description", content: "Hantera ditt Euroute-konto, exportera eller radera data." },
+      { property: "og:title", content: "Mitt konto – Euroute" },
+      { property: "og:description", content: "Hantera ditt Euroute-konto, exportera eller radera data." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
       { name: "robots", content: "noindex, nofollow" },
     ],
   }),

@@ -11,7 +11,9 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { TravelStyleSelector } from "@/components/TravelStyleSelector";
 import { Button } from "@/components/ui/button";
 import { planOvernight } from "@/lib/overnight.functions";
+import { reconcileRequestedStop } from "@/lib/overnight-optional";
 import { planTrip } from "@/lib/rail.functions";
+import { railErrorMessageKey } from "@/lib/rail-error";
 import { tripPlanFromOption, tripPlanFromOvernight } from "@/lib/trip-plan";
 import { useI18n } from "@/lib/i18n";
 import {
@@ -22,8 +24,16 @@ import {
   placeToString,
   type Place,
 } from "@/lib/journey";
+import {
+  parseIntentParam,
+  parseStopIdParam,
+  parseViaList,
+  placeFromParams,
+  stringList,
+} from "@/lib/search-endpoints";
 import { analyseJourneys, type TravelStyle } from "@/lib/journey-intelligence";
 import { parseStyle, preferencesFromSearch } from "@/lib/search-params";
+import { zoneForPlace } from "@/lib/station-timezone";
 
 type SokSearch = {
   from: string;
@@ -38,17 +48,20 @@ type SokSearch = {
   apiMaxTransfers: number;
   /** Overnight stop the traveller asked for, as "name|lat,lon". */
   stay: string;
+  /** Phase 3C: endpoint intent + stop id, additive and optional. */
+  fromIntent: string;
+  fromId: string;
+  toIntent: string;
+  toId: string;
+  viaIntent: string[];
+  viaId: string[];
 };
 
 export const Route = createFileRoute("/sok")({
   validateSearch: (search: Record<string, unknown>): SokSearch => ({
     from: String(search["from"] ?? ""),
     to: String(search["to"] ?? ""),
-    via: Array.isArray(search["via"])
-      ? (search["via"] as unknown[]).map(String)
-      : search["via"]
-        ? [String(search["via"])]
-        : [],
+    via: stringList(search["via"]),
     depart: String(search["depart"] ?? ""),
     style: parseStyle(search["style"]),
     minTransfer: Number(search["minTransfer"] ?? 15),
@@ -57,6 +70,12 @@ export const Route = createFileRoute("/sok")({
     flags: String(search["flags"] ?? ""),
     apiMaxTransfers: Number(search["apiMaxTransfers"] ?? 6),
     stay: String(search["stay"] ?? ""),
+    fromIntent: parseIntentParam(search["fromIntent"]) ?? "",
+    fromId: parseStopIdParam(search["fromId"]) ?? "",
+    toIntent: parseIntentParam(search["toIntent"]) ?? "",
+    toId: parseStopIdParam(search["toId"]) ?? "",
+    viaIntent: stringList(search["viaIntent"]).map((v) => parseIntentParam(v) ?? ""),
+    viaId: stringList(search["viaId"]).map((v) => parseStopIdParam(v) ?? ""),
   }),
 
   head: () => ({
@@ -72,6 +91,8 @@ export const Route = createFileRoute("/sok")({
         property: "og:description",
         content: "Alla etapper, alla bolag och bokningslänkar i samma vy.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
       { name: "robots", content: "noindex, nofollow" },
     ],
   }),
@@ -84,22 +105,48 @@ function SokPage() {
   const navigate = Route.useNavigate();
   const [showMore, setShowMore] = useState(false);
 
-  const from = useMemo(() => parsePlace(search.from), [search.from]);
-  const to = useMemo(() => parsePlace(search.to), [search.to]);
+  // Endpoints come from the URL only – no in-memory Place survives a
+  // reload or a Back/Forward navigation.
+  const from = useMemo(
+    () => placeFromParams(search.from, search.fromIntent, search.fromId),
+    [search.from, search.fromIntent, search.fromId],
+  );
+  const to = useMemo(
+    () => placeFromParams(search.to, search.toIntent, search.toId),
+    [search.to, search.toIntent, search.toId],
+  );
+  // The requested departure is local civil time at the origin, so the summary
+  // and Edit Search must be read back in the origin station's zone.
+  const originZone = useMemo(() => zoneForPlace(from?.place), [from?.place]);
+
   const via = useMemo<Place[]>(
-    () =>
-      (search.via as string[])
-        .map((value: string) => parsePlace(value))
-        .filter((place): place is Place => Boolean(place)),
-    [search.via],
+    () => parseViaList(search.via, search.viaIntent, search.viaId),
+    [search.via, search.viaIntent, search.viaId],
   );
 
   const preferences = useMemo(() => preferencesFromSearch(search), [search]);
   const style = parseStyle(search.style);
 
   const query = useQuery({
-    queryKey: ["plan", search],
+    // Ranking profile is applied client-side, so it must not be part of the
+    // key – switching style re-ranks the cached result instead of re-fetching.
+    queryKey: [
+      "plan",
+      search.from,
+      search.to,
+      search.via,
+      search.viaIntent,
+      search.viaId,
+      search.fromIntent,
+      search.fromId,
+      search.toIntent,
+      search.toId,
+      search.depart,
+      search.apiMaxTransfers,
+      search.minTransfer,
+    ],
     enabled: Boolean(from && to && search.depart),
+
     queryFn: () =>
       planTrip({
         data: {
@@ -115,14 +162,23 @@ function SokPage() {
 
   const journeys = query.data?.journeys ?? [];
   const analysis = useMemo(
-    () => analyseJourneys({ journeys, preferences, style }),
-    [journeys, preferences, style],
+    () =>
+      analyseJourneys({ journeys, preferences, style, requestedDepartureIso: search.depart }),
+    [journeys, preferences, style, search.depart],
   );
+
 
   // Smart overnight is evaluated after the normal results are on screen, so
   // the extra timetable searches never delay the primary journey list.
   const baseOption = analysis.options[0];
-  const requestedStop = useMemo(() => parsePlace(search.stay), [search.stay]);
+  // The URL only carries "name|lat,lon", so the richer endpoint metadata of a
+  // chosen stop (intent, stopId) is kept in session state and reapplied when it
+  // refers to the same coordinates as the URL stop.
+  const [selectedStop, setSelectedStop] = useState<Place | null>(null);
+  const requestedStop = useMemo(
+    () => reconcileRequestedStop(parsePlace(search.stay), selectedStop),
+    [search.stay, selectedStop],
+  );
 
   const overnight = useQuery({
     queryKey: [
@@ -134,6 +190,8 @@ function SokPage() {
       search.maxPerDay,
       search.maxTransfers,
       search.stay,
+      requestedStop?.intent ?? "",
+      requestedStop?.stopId ?? "",
     ],
     enabled: Boolean(baseOption && from && to),
     staleTime: 5 * 60_000,
@@ -153,6 +211,7 @@ function SokPage() {
   });
 
   function setRequestedStop(place: Place | null) {
+    setSelectedStop(place);
     void navigate({
       to: ".",
       search: (prev) => ({ ...prev, stay: place ? placeToString(place) : "" }),
@@ -192,7 +251,7 @@ function SokPage() {
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {t(search.maxTransfers === "any" ? "search.summaryAny" : "search.summary", {
-            day: formatDay(search.depart, lang),
+            day: formatDay(search.depart, lang, originZone),
             max: search.maxTransfers,
             min: search.minTransfer,
           })}
@@ -218,12 +277,22 @@ function SokPage() {
             ) : query.data?.error ? (
               <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-6">
                 <p className="font-medium">{t("search.failedTitle")}</p>
-                <p className="mt-1 text-sm text-muted-foreground">{query.data.error}</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {t(railErrorMessageKey(query.data.error))}
+                </p>
               </div>
             ) : journeys.length === 0 ? (
               <div className="rounded-xl border border-border bg-card p-6">
                 <p className="font-medium">{t("search.emptyTitle")}</p>
                 <p className="mt-1 text-sm text-muted-foreground">{t("search.emptyText")}</p>
+              </div>
+            ) : analysis.allJourneysUnusable ? (
+              <div className="rounded-xl border border-border bg-card p-6">
+                <p className="font-medium">{t("search.unusableTitle")}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{t("search.unusableText")}</p>
+                <Button asChild variant="outline" className="mt-4">
+                  <Link to="/">{t("search.toSearch")}</Link>
+                </Button>
               </div>
             ) : (
               <>
@@ -256,6 +325,7 @@ function SokPage() {
                   onRequestStop={setRequestedStop}
                   renderAction={(plan) => (
                     <SaveTripButton
+                      label={t("search.saveOvernight")}
                       buildPlan={() =>
                         tripPlanFromOvernight({
                           plan,
@@ -318,8 +388,8 @@ function SokPage() {
                     from,
                     to,
                     via,
-                    date: civilDate(search.depart),
-                    time: civilTime(search.depart),
+                    date: civilDate(search.depart, originZone),
+                    time: civilTime(search.depart, originZone),
                     style,
                     preferences,
                   }}

@@ -20,9 +20,11 @@ export const Route = createFileRoute("/integritet")({
         property: "og:description",
         content: "Så hanterar Euroute konto, sparade reseplaner och statistik.",
       },
-      { property: "og:url", content: "https://euroute.lovable.app/integritet" },
+      { property: "og:url", content: "https://euroute.app/integritet" },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
-    links: [{ rel: "canonical", href: "https://euroute.lovable.app/integritet" }],
+    links: [{ rel: "canonical", href: "https://euroute.app/integritet" }],
   }),
   component: PrivacyPage,
 });

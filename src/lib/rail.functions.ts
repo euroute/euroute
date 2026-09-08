@@ -9,13 +9,9 @@ import {
   searchBudgetId,
   upstreamBudget,
 } from "./abuse.server";
+import { PlaceSchema } from "./place-schema";
+import type { RailErrorCode } from "./rail-error";
 import { geocodePlaces, planJourneys } from "./rail.server";
-
-const PlaceSchema = z.object({
-  name: z.string().min(1).max(160),
-  place: z.string().regex(/^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/),
-  country: z.string().max(8).optional(),
-});
 
 /** Guests must be able to search freely; these ceilings only stop floods. */
 const STATION_LIMIT_PER_MINUTE = 60;
@@ -36,13 +32,16 @@ export const searchStations = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const limit = rateLimit("stations", await clientKey(), STATION_LIMIT_PER_MINUTE, 60_000);
     if (!limit.ok) {
-      return { places: [], error: "För många sökningar just nu. Försök igen om en stund." };
+      return { places: [], error: "rate_limited" as RailErrorCode };
     }
     try {
-      return { places: await geocodePlaces(data.text, data.language), error: null as string | null };
+      return {
+        places: await geocodePlaces(data.text, data.language),
+        error: null as RailErrorCode | null,
+      };
     } catch (error) {
       console.error("geocode failed", error);
-      return { places: [], error: "Kunde inte söka stationer just nu." };
+      return { places: [], error: "station_search_failed" as RailErrorCode };
     }
   });
 
@@ -65,10 +64,7 @@ export const planTrip = createServerFn({ method: "POST" })
     const key = await clientKey();
     const limit = rateLimit("plan", key, PLAN_LIMIT_PER_MINUTE, 60_000);
     if (!limit.ok) {
-      return {
-        journeys: [],
-        error: "För många sökningar just nu. Vänta en stund och sök igen.",
-      };
+      return { journeys: [], error: "rate_limited" as RailErrorCode };
     }
     try {
       const budget = upstreamBudget(
@@ -77,13 +73,9 @@ export const planTrip = createServerFn({ method: "POST" })
         UPSTREAM_BUDGET_WINDOW_MS,
       );
       const journeys = await planJourneys({ ...data, budget });
-      return { journeys, error: null as string | null };
+      return { journeys, error: null as RailErrorCode | null };
     } catch (error) {
       console.error("plan failed", error);
-      return {
-        journeys: [],
-        error:
-          "Tidtabellstjänsten kunde inte svara för den här sträckan. Prova en närliggande station eller ett annat datum.",
-      };
+      return { journeys: [], error: "timetable_unavailable" as RailErrorCode };
     }
   });

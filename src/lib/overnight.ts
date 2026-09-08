@@ -25,7 +25,10 @@
  * the two are modelled separately.
  */
 
+import { overnightStationKey } from "./station-identity";
 import { formatClock, formatDuration, type Journey, type Leg } from "./journey";
+import { journeyHasNightTrain } from "./night-train";
+import { zoneForPlace } from "./station-timezone";
 import {
   journeyFacts,
   transitLegs,
@@ -40,13 +43,22 @@ import {
 
 const TZ = "Europe/Stockholm";
 
-export function localDate(iso: string): string {
+export function localDate(iso: string, zone: string = TZ): string {
   return new Intl.DateTimeFormat("sv-SE", {
-    timeZone: TZ,
+    timeZone: zone,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
   }).format(new Date(iso));
+}
+
+/** Whole local calendar days between two instants, in one zone. */
+function calendarDayDelta(fromIso: string, toIso: string, zone: string = TZ): number {
+  const from = localDate(fromIso, zone);
+  const to = localDate(toIso, zone);
+  return Math.round(
+    (new Date(`${to}T12:00:00Z`).getTime() - new Date(`${from}T12:00:00Z`).getTime()) / 86400000,
+  );
 }
 
 export function localHour(iso: string): number {
@@ -83,6 +95,85 @@ export function addDays(date: string, days: number): string {
 }
 
 /* ------------------------------------------------------------------ *
+ * Overnight station waits (the "night on a bench" pattern)
+ * ------------------------------------------------------------------ *
+ *
+ * A continuous itinerary can be technically valid and still force the
+ * traveller to spend most of the night waiting at a station. That is a real
+ * comfort cost, not a neutral "long wait": it is the pattern
+ *
+ *   arrival late evening  ->  departure next local morning
+ *
+ * Detection is based on how much of the actual NIGHT the wait occupies
+ * (local time), not on a raw duration threshold, so 21:57 -> 06:45 counts
+ * while a 45-minute 22:30 -> 23:15 transfer does not, and an 8-hour daytime
+ * wait (14:00 -> 22:00) does not either.
+ */
+
+/** Local night window used for night coverage: 23:00 -> 06:00. */
+const NIGHT_START_MINUTE = 23 * 60;
+const NIGHT_END_MINUTE = 30 * 60; // 06:00 the following local day
+
+/** Minutes of the wait that fall inside the local night window. */
+export function nightCoverageMinutes(arrivalIso: string, departureIso: string): number {
+  const wait = minutesBetween(arrivalIso, departureIso);
+  if (wait <= 0) return 0;
+  const startOfDay = localHour(arrivalIso) * 60 + localMinute(arrivalIso);
+  let covered = 0;
+  // Look at the night before, the night of the arrival day and the next one.
+  for (let day = -1; day <= 2; day += 1) {
+    const from = day * 1440 + NIGHT_START_MINUTE - startOfDay;
+    const to = day * 1440 + NIGHT_END_MINUTE - startOfDay;
+    covered += Math.max(0, Math.min(wait, to) - Math.max(0, from));
+  }
+  return covered;
+}
+
+/** Wait long enough, and night-covering enough, to be a night at a station. */
+const NIGHT_WAIT_MIN_MINUTES = 240;
+const NIGHT_WAIT_MIN_NIGHT_MINUTES = 240;
+
+export function isOvernightStationWait(args: { arrival: string; departure: string }): boolean {
+  const wait = minutesBetween(args.arrival, args.departure);
+  if (wait < NIGHT_WAIT_MIN_MINUTES) return false;
+  return nightCoverageMinutes(args.arrival, args.departure) >= NIGHT_WAIT_MIN_NIGHT_MINUTES;
+}
+
+export type OvernightStationWait = {
+  /** Index of the departing transit leg (day 2 would start here). */
+  transitIndex: number;
+  station: string;
+  place: string | undefined;
+  arrival: string;
+  departure: string;
+  waitMinutes: number;
+  nightMinutes: number;
+};
+
+/** Every station wait in this itinerary that meaningfully occupies the night. */
+export function overnightStationWaits(journey: Journey): OvernightStationWait[] {
+  const transit = transitLegs(journey);
+  const waits: OvernightStationWait[] = [];
+  for (let i = 1; i < transit.length; i += 1) {
+    const arriving = transit[i - 1]!;
+    const departing = transit[i]!;
+    if (!isOvernightStationWait({ arrival: arriving.arrival, departure: departing.departure }))
+      continue;
+    waits.push({
+      transitIndex: i,
+      station: arriving.toName,
+      place: arriving.toPlace,
+      arrival: arriving.arrival,
+      departure: departing.departure,
+      waitMinutes: minutesBetween(arriving.arrival, departing.departure),
+      nightMinutes: nightCoverageMinutes(arriving.arrival, departing.departure),
+    });
+  }
+  return waits;
+}
+
+
+/* ------------------------------------------------------------------ *
  * Types
  * ------------------------------------------------------------------ */
 
@@ -117,6 +208,29 @@ export type RestWindowQuality = "veryGood" | "good" | "short" | "poor";
  */
 export type OvernightConfidence = "strong" | "alternative" | "weak";
 
+/**
+ * Why this plan exists (Model 2, Phase A + C).
+ *
+ * - "recommended": Euroute proactively believes the overnight materially
+ *   improves the journey. Governed by the comparative gates in
+ *   `overnightConfidence`.
+ * - "optional" (Phase C): a sensible place to split the journey if the
+ *   traveller prefers two days. Does not have to beat the continuous journey,
+ *   but must pass `optionalViability`. Never labelled recommended.
+ * - "requested": the traveller explicitly asked to split the journey in a
+ *   city. Skips the comparative gates, but must pass `requestedViability`.
+ *
+ * The field is OPTIONAL on purpose: saved-trip snapshots written before this
+ * phase have no `mode`. Legacy plans are interpreted as "recommended", which is
+ * exactly how they were produced and rendered. Old snapshots are never mutated.
+ */
+export type OvernightMode = "recommended" | "optional" | "requested";
+
+/** Legacy-safe read of a plan's mode. */
+export function overnightMode(plan: { mode?: OvernightMode | undefined }): OvernightMode {
+  return plan.mode ?? "recommended";
+}
+
 export type OvernightDayStats = {
   /** 1-based travel day. */
   day: number;
@@ -139,6 +253,8 @@ export type OvernightDayStats = {
 
 export type OvernightPlan = {
   id: string;
+  /** Model 2 provenance. Absent on legacy snapshots => "recommended". */
+  mode?: OvernightMode;
   /** One real journey per travel day, in order. */
   days: Journey[];
   /** Per-day burden facts, used by the score and the UI copy. */
@@ -152,16 +268,43 @@ export type OvernightPlan = {
   longestDayTrainMinutes: number;
   /** First departure to final arrival, including the nights. */
   elapsedMinutes: number;
-  /** Extra time on trains/at stations compared with travelling continuously. */
+  /**
+   * Extra time on trains/at stations compared with travelling continuously.
+   * This is a TRAVEL-BURDEN measure: the nights between travel days are NOT
+   * included, so it must never be used to express "how much later do I get
+   * there?".
+   */
   addedTravelMinutes: number;
+  /**
+   * Honest elapsed cost of inserting the overnight: this plan's first
+   * departure -> final arrival, minus the continuous journey's own elapsed
+   * duration. Includes the nights. Negative when the plan happens to arrive
+   * earlier than the compared base itinerary.
+   */
+  addedElapsedMinutes: number;
+  /**
+   * Whole local calendar days between the base arrival and this plan's final
+   * arrival, measured in the destination station's zone. 0 = same local day.
+   */
+  arrivalDayDelta: number;
+  /** True when this plan arrives on a later local calendar day than the base. */
+  arrivesLaterDay: boolean;
   changes: number;
   stationChanges: number;
   riskyConnections: number;
   tightConnections: number;
   hasNightTravel: boolean;
   meetsMaxPerDay: boolean;
+  /**
+   * True when the base continuous itinerary made the traveller spend a night
+   * waiting at a station and this plan turns that into a real overnight stay.
+   */
+  convertsStationNightToStay: boolean;
+  /** Overnight station waits this plan still forces on the traveller. */
+  retainedStationNights: number;
   /** Weakest rest window across the stays. */
   restQuality: RestWindowQuality;
+
   /** Internal overnight quality, 0–100. Not shown as a second score. */
   score: number;
   benefits: OvernightBenefit[];
@@ -197,7 +340,7 @@ export function journeyFromLegs(legs: Leg[], id: string): Journey {
     minTransferMinutes: gaps.length ? Math.min(...gaps) : undefined,
     legs,
     operators: Array.from(new Set(transit.map((l) => l.operator).filter(Boolean) as string[])),
-    hasNightLeg: transit.some((l) => l.mode === "NIGHT_RAIL"),
+    hasNightLeg: journeyHasNightTrain({ legs }),
     chained: true,
   };
 }
@@ -300,15 +443,6 @@ export type SplitCandidate = {
   fitness: number;
 };
 
-function normStation(name: string): string {
-  return name
-    .toLowerCase()
-    .split(",")[0]!
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\b(hbf|hauptbahnhof|centralstation|central|c|st|station)\b/g, "")
-    .replace(/[^a-z0-9]+/g, "");
-}
 
 /**
  * Arrival-time quality at the overnight city: enough of the evening left to
@@ -393,7 +527,7 @@ export function splitCandidates(
     const arrival = raw > 0 ? raw : opts.relaxArrival && hour >= 9 && hour <= 13 ? 1 : 0;
     if (arrival === 0) continue;
 
-    const key = normStation(arriving.toName);
+    const key = overnightStationKey(arriving.toName);
     if (!key || seen.has(key)) continue;
     seen.add(key);
 
@@ -475,20 +609,33 @@ export function dayBurden(effort: number): DayBurden {
  * Rest window quality from the facts we have: when the traveller arrives,
  * how long the train-to-train gap is and when they must leave again. No
  * fictional sleep duration, no assumptions about hotels.
+ *
+ * `nightMinutes` (how much of the local night 23:00–06:00 the stay covers) is
+ * the primary signal when available: a stay from 21:57 to 06:45 covers the
+ * whole night and is a real overnight opportunity even though it is a few
+ * minutes short of a raw 9-hour threshold. Raw duration is only the fallback.
  */
 export function restWindowQuality(args: {
   arrivalHour: number;
   departureHour: number;
   waitMinutes: number;
+  /** Minutes of the stay inside the local night window, when known. */
+  nightMinutes?: number;
 }): RestWindowQuality {
   const { arrivalHour: a, departureHour: d, waitMinutes: wait } = args;
+  const night = args.nightMinutes ?? 0;
   const lateArrival = a >= 23 || a <= 4;
   const earlyDeparture = d <= 5;
-  if (lateArrival || earlyDeparture || wait < 420) return "poor";
+  if (lateArrival || earlyDeparture) return "poor";
+  // Full or near-full night coverage with a civilised arrival and departure.
+  if (night >= 420 && a <= 22 && d >= 6) return "veryGood";
+  if (night >= 300 && a <= 22 && d >= 6) return "good";
+  if (wait < 420) return "poor";
   if (wait >= 660 && a <= 21 && d >= 8) return "veryGood";
   if (wait >= 540 && a <= 22 && d >= 7) return "good";
   return "short";
 }
+
 
 const REST_POINTS: Record<RestWindowQuality, number> = {
   veryGood: 20,
@@ -541,6 +688,8 @@ export function buildOvernightPlan(args: {
   preferences: JourneyPreferences;
   /** How many overnight cities were actually compared (for honest copy). */
   comparedCities?: number;
+  /** Provenance of this plan. Defaults to the proactive path. */
+  mode?: OvernightMode;
 }): OvernightPlan {
   const { days, base, baseFacts, preferences: prefs } = args;
 
@@ -571,6 +720,20 @@ export function buildOvernightPlan(args: {
   const longestDayTrainMinutes = Math.max(...dayStats.map((d) => d.trainMinutes));
   const elapsedMinutes = minutesBetween(days[0]!.departure, days[days.length - 1]!.arrival);
   const addedTravelMinutes = Math.max(0, travelMinutes - base.durationMinutes);
+  /**
+   * Honest elapsed cost. Both sides are absolute instants (ISO timestamps
+   * subtracted as epoch milliseconds), so DST transitions and zone changes
+   * along the route cannot distort it. `base.durationMinutes` is the same
+   * departure->arrival instant difference for the continuous itinerary.
+   */
+  const finalArrival = days[days.length - 1]!.arrival;
+  const addedElapsedMinutes = elapsedMinutes - base.durationMinutes;
+  // Calendar-day comparison happens in the destination station's own zone when
+  // we know it, so "later day" means later day where the traveller arrives.
+  const destinationLegs = transitLegs(days[days.length - 1]!);
+  const destinationZone = zoneForPlace(destinationLegs[destinationLegs.length - 1]?.toPlace);
+  const arrivalDayDelta = calendarDayDelta(base.arrival, finalArrival, destinationZone);
+  const arrivesLaterDay = arrivalDayDelta >= 1;
 
   const risky = dayStats.reduce((n, d) => n + d.risky, 0);
   const tight = dayStats.reduce((n, d) => n + d.tight, 0);
@@ -581,12 +744,21 @@ export function buildOvernightPlan(args: {
   const limitMinutes = prefs.maxTravelHoursPerDay ? prefs.maxTravelHoursPerDay * 60 : null;
   const meetsMaxPerDay = limitMinutes === null || longestDayMinutes <= limitMinutes;
 
+  /* ---- station nights: base drawback vs. this plan ----------------- */
+  const baseStationNights = overnightStationWaits(base);
+  const retainedStationNights = days.reduce((n, d) => n + overnightStationWaits(d).length, 0);
+  // The base forced a night at a station and this plan does not: that is a
+  // genuine comfort improvement even when nothing gets shorter.
+  const convertsStationNightToStay =
+    baseStationNights.length > 0 && retainedStationNights < baseStationNights.length;
+
   /* ---- rest windows ------------------------------------------------ */
   const restQualities = stays.map((s) =>
     restWindowQuality({
       arrivalHour: localHour(s.arrival),
       departureHour: localHour(s.departure),
       waitMinutes: s.waitMinutes,
+      nightMinutes: nightCoverageMinutes(s.arrival, s.departure),
     }),
   );
   const order: RestWindowQuality[] = ["poor", "short", "good", "veryGood"];
@@ -613,6 +785,10 @@ export function buildOvernightPlan(args: {
   const connectionQuality = Math.max(0, 15 - risky * 8 - tight * 4);
   const balance = Math.round(balanceScore(dayMinutes) / 4); // max 5, tie-breaker only
   const extra = -Math.min(25, Math.round(addedTravelMinutes / 12));
+  // A station night is its own comfort cost, separate from risky connections:
+  // relief when it becomes a bed, a real penalty when the plan keeps it.
+  const stationNightRelief = convertsStationNightToStay ? 12 : 0;
+  const stationNightPenalty = -Math.min(20, retainedStationNights * 12);
   let preferenceFit = 0;
   if (prefs.allowOvernightStop) preferenceFit += 5;
   if (!meetsMaxPerDay) preferenceFit -= 10;
@@ -632,15 +808,30 @@ export function buildOvernightPlan(args: {
         balance +
         extra +
         preferenceFit +
-        stationPenalty,
+        stationPenalty +
+        stationNightRelief +
+        stationNightPenalty,
     ),
   );
+
 
   /* ---- benefits: only statements true for THIS itinerary ----------- */
   const benefits: OvernightBenefit[] = [];
   if (!hasNightTravel && (baseFacts.overnight || baseFacts.hasNightTrain))
     benefits.push({ key: "on.benefit.noNightTravel" });
-  if (longestDayMinutes <= baseFacts.longestTravelDayMinutes - 90)
+  if (convertsStationNightToStay) {
+    const night = baseStationNights[0]!;
+    benefits.push({
+      key: "on.benefit.stationNightToStay",
+      vars: {
+        city: cityName(night.station),
+        time: formatDuration(night.waitMinutes),
+      },
+    });
+  }
+  // Unit note: both sides are onboard/travel minutes per day, so the
+  // comparison is like-with-like (see `muchShorterDays`).
+  if (longestDayTrainMinutes <= baseFacts.longestTravelDayMinutes - 90)
     benefits.push({
       key: "on.benefit.shorterDays",
       vars: { time: formatDuration(longestDayMinutes) },
@@ -661,6 +852,15 @@ export function buildOvernightPlan(args: {
 
   /* ---- warnings: the honest downsides ------------------------------ */
   const warnings: OvernightBenefit[] = [];
+  // The elapsed cost is the headline drawback, so it leads the list (the card
+  // shows the first three warnings).
+  if (addedElapsedMinutes >= MATERIAL_DELAY_MINUTES)
+    warnings.push({
+      key: "on.warn.addedElapsed",
+      vars: { time: formatDuration(addedElapsedMinutes) },
+    });
+  if (retainedStationNights > 0) warnings.push({ key: "on.warn.stationNight" });
+
   for (const d of dayStats) {
     if (d.burden === "veryLong" || d.burden === "extreme")
       warnings.push({
@@ -689,8 +889,8 @@ export function buildOvernightPlan(args: {
       warnings.push({
         key: `on.warn.rest.${restQuality}`,
         vars: {
-          arrival: formatClock(stay.arrival),
-          departure: formatClock(stay.departure),
+          arrival: formatClock(stay.arrival, zoneForPlace(stay.place)),
+          departure: formatClock(stay.departure, zoneForPlace(stay.place)),
         },
       });
   }
@@ -737,7 +937,8 @@ export function buildOvernightPlan(args: {
   }
 
   return {
-    id: `${days[0]!.id}-on-${stays.map((s) => normStation(s.station)).join("-")}`,
+    mode: args.mode ?? "recommended",
+    id: `${days[0]!.id}-on-${stays.map((s) => overnightStationKey(s.station)).join("-")}`,
     days,
     dayStats,
     stays,
@@ -746,13 +947,19 @@ export function buildOvernightPlan(args: {
     longestDayTrainMinutes,
     elapsedMinutes,
     addedTravelMinutes,
+    addedElapsedMinutes,
+    arrivalDayDelta,
+    arrivesLaterDay,
     changes,
     stationChanges,
     riskyConnections: risky,
     tightConnections: tight,
     hasNightTravel,
     meetsMaxPerDay,
+    convertsStationNightToStay,
+    retainedStationNights,
     restQuality,
+
     score,
     benefits,
     warnings,
@@ -771,6 +978,23 @@ export function buildOvernightPlan(args: {
  *   alternative – improves some things, real trade-offs remain
  *   weak        – not worth recommending; keep the continuous journey
  */
+
+/**
+ * Smallest elapsed delay worth telling the traveller about. Reuses the
+ * existing added-time threshold (`on.warn.addedTime`) so ordinary timetable
+ * variation never produces a warning.
+ */
+export const MATERIAL_DELAY_MINUTES = 120;
+
+/**
+ * How much longer than the continuous journey a split may take before it stops
+ * being a normal recommendation. Same style-dependent architecture as before –
+ * only the quantity it measures became honest.
+ */
+export function maxExtraRatio(style: TravelStyle): number {
+  return style === "comfortable" ? 0.45 : style === "fastest" ? 0.15 : 0.3;
+}
+
 
 export function overnightConfidence(args: {
   plan: OvernightPlan;
@@ -793,11 +1017,21 @@ export function overnightConfidence(args: {
     plan.meetsMaxPerDay &&
     baseFacts.longestTravelDayMinutes > limitMinutes;
   const saferConnections = baseRisk > plan.riskyConnections + plan.tightConnections;
-  const muchShorterDays = plan.longestDayMinutes <= baseFacts.longestTravelDayMinutes - 180;
+  /**
+   * Unit fix: `baseFacts.longestTravelDayMinutes` is onboard/travel minutes per
+   * calendar day, so it must be compared with the plan's own onboard minutes
+   * (`longestDayTrainMinutes`), never with the travel-day window. Onboard
+   * minutes are the representation used here because they express the burden
+   * that actually belongs to the day on both sides of the comparison.
+   */
+  const muchShorterDays =
+    plan.longestDayTrainMinutes <= baseFacts.longestTravelDayMinutes - 180;
   const betterArrival =
     (baseFacts.arrivalHour >= 23 || baseFacts.arrivalHour <= 5) &&
     plan.days.every((d) => localHour(d.arrival) < 23 && localHour(d.arrival) > 5);
   const fewerChanges = plan.changes < baseFacts.connections.filter((c) => !c.longWait).length;
+  // C -> D: a night on a station bench becomes an intentional overnight stay.
+  const convertsStationNightToStay = plan.convertsStationNightToStay;
 
   const improvements = [
     removesNight,
@@ -806,20 +1040,44 @@ export function overnightConfidence(args: {
     muchShorterDays,
     betterArrival,
     fewerChanges,
+    convertsStationNightToStay,
   ].filter(Boolean).length;
 
   // A stop the traveller asked for is always built, but still labelled honestly.
   if (improvements === 0 && !args.requested) return { confidence: "weak", tradeoff: null };
 
-  const extraRatio = plan.addedTravelMinutes / Math.max(1, base.durationMinutes);
-  const maxExtraRatio = style === "comfortable" ? 0.45 : style === "fastest" ? 0.15 : 0.3;
-  if (extraRatio > maxExtraRatio && !args.requested) return { confidence: "weak", tradeoff: null };
+
+  /**
+   * Cost guard (Phase 1). The question here is "how much longer does choosing
+   * this overnight make the trip?", so the honest elapsed delta is used, not
+   * the travel-burden delta: the night at the stop is exactly the part that
+   * `addedTravelMinutes` cannot see.
+   *
+   * A plan that solves a real problem in the base itinerary (a night on a
+   * station bench, unavoidable night travel, a broken daily limit) is not
+   * suppressed by the guard – it is only barred from being sold as a clearly
+   * better way to travel, and keeps its honest drawbacks. `arrivesLaterDay` is
+   * supporting evidence: paying more than the ratio allows AND landing on a
+   * later local day is the excessive-cost case we saw live.
+   */
+  const excessiveCost = plan.addedElapsedMinutes / Math.max(1, base.durationMinutes) > maxExtraRatio(style);
+  const solvesRealProblem = removesNight || satisfiesLimit || convertsStationNightToStay;
+  if (excessiveCost && !args.requested && !solvesRealProblem)
+    return { confidence: "weak", tradeoff: null };
+
 
   const hardestDay = plan.dayStats.reduce(
     (worst, d) => (d.windowMinutes > worst.windowMinutes ? d : worst),
     plan.dayStats[0]!,
   );
   const drawbacks: OvernightBenefit[] = [];
+  // An excessive elapsed cost that survived the guard (because the plan solves
+  // a real problem) is still a drawback, so it can never be sold as "strong".
+  if (excessiveCost && plan.addedElapsedMinutes >= MATERIAL_DELAY_MINUTES)
+    drawbacks.push({
+      key: "on.tradeoff.addedElapsed",
+      vars: { time: formatDuration(plan.addedElapsedMinutes) },
+    });
   if (hardestDay.burden === "veryLong" || hardestDay.burden === "extreme")
     drawbacks.push({
       key: "on.tradeoff.longDay",
@@ -827,6 +1085,7 @@ export function overnightConfidence(args: {
     });
   if (plan.riskyConnections > 0) drawbacks.push({ key: "on.tradeoff.risky" });
   if (plan.restQuality === "poor") drawbacks.push({ key: "on.tradeoff.rest" });
+  if (plan.retainedStationNights > 0) drawbacks.push({ key: "on.tradeoff.stationNight" });
   if (limitMinutes !== null && !plan.meetsMaxPerDay)
     drawbacks.push({
       key: "on.tradeoff.overLimit",
@@ -850,15 +1109,18 @@ export function overnightConfidence(args: {
 
   // A long day is not a real drawback when it is dramatically shorter than
   // travelling straight through and the night on a train disappears.
+  // Both sides are onboard/travel minutes per day (unit-consistent).
   const longDayForgiven =
     removesNight &&
-    (plan.longestDayMinutes <= baseFacts.longestTravelDayMinutes - 360 ||
-      plan.longestDayMinutes <= base.durationMinutes / 2);
+    (plan.longestDayTrainMinutes <= baseFacts.longestTravelDayMinutes - 360 ||
+      plan.longestDayTrainMinutes <= base.durationMinutes / 2);
   const blocking = longDayForgiven
     ? drawbacks.filter((d) => d.key !== "on.tradeoff.longDay")
     : drawbacks;
 
-  if (blocking.length === 0 && plan.score >= strongMin && improvements >= 1)
+  // A requested split is the traveller's own preference, never a Euroute
+  // recommendation: it can never be labelled "strong".
+  if (blocking.length === 0 && plan.score >= strongMin && improvements >= 1 && !args.requested)
     return { confidence: "strong", tradeoff: null };
 
   // A plan can still be a useful alternative below the score threshold when
@@ -867,10 +1129,21 @@ export function overnightConfidence(args: {
   const clearGains =
     improvements >= 2 &&
     !plan.hasNightTravel &&
-    plan.longestDayMinutes < baseFacts.longestTravelDayMinutes;
+    plan.longestDayTrainMinutes < baseFacts.longestTravelDayMinutes;
 
-  if (plan.score >= altMin || clearGains || args.requested)
+  // Turning a night at a station into a bed is a gain on its own, but the plan
+  // still has to be a sane itinerary: no extreme travel day, no risky
+  // connections, and it must not keep another station night.
+  const stationNightGain =
+    convertsStationNightToStay &&
+    plan.retainedStationNights === 0 &&
+    plan.riskyConnections === 0 &&
+    !plan.dayStats.some((d) => d.burden === "extreme") &&
+    (limitMinutes === null || plan.meetsMaxPerDay);
+
+  if (plan.score >= altMin || clearGains || stationNightGain || args.requested)
     return { confidence: "alternative", tradeoff: tradeoff ?? drawbacks[0] ?? null };
+
 
   return { confidence: "weak", tradeoff: null };
 }

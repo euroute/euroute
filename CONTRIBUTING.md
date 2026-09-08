@@ -4,7 +4,9 @@ Thanks for your interest. Euroute is a small project, so the process is light.
 
 ## Running it locally
 
-Requirements: [Bun](https://bun.sh) (recommended) or Node.js 20+ with npm.
+Requirements: [Bun](https://bun.sh) — the canonical package manager for this
+repository. Node.js 20+ with npm works too, but do not commit a generated
+`package-lock.json`.
 
 ```sh
 bun install
@@ -14,7 +16,10 @@ bun run dev
 
 You need your own Supabase project. Apply the SQL files in
 `supabase/migrations/` in order to get the schema, row-level-security policies
-and grants. See the README for what each environment variable does.
+and grants. Journey data needs no API key — Transitous is open.
+
+Full setup and command reference: [`docs/development.md`](docs/development.md).
+System overview: [`docs/architecture.md`](docs/architecture.md).
 
 `bun.lock` is the lockfile used by the production build. Commit lockfile changes
 only when you intentionally change dependencies.
@@ -41,12 +46,17 @@ over time.
 
 1. Fork and branch from `main`.
 2. Keep the change focused; one concern per pull request.
-3. Run `bun run lint` and `bun run format`, and make sure `bun run build`
-   succeeds.
+3. Run `bun run lint`, `bun run test` and `bun run format`, and make sure
+   `bun run build` succeeds. New logic — scoring, connection rules, station
+   handling, time zones — should come with tests; the existing suite under
+   `src/**/*.test.ts` is the pattern to follow.
 4. Describe what changed and why, and note any database migration or new
    environment variable.
 5. By contributing, you agree your contribution is licensed under
    AGPL-3.0-only, the licence of this project.
+6. Respect [`TRADEMARKS.md`](TRADEMARKS.md): the code is open, the Euroute name,
+   logo and visual identity are not. Do not add or alter brand assets, and do
+   not present a fork as the official Euroute service.
 
 ## Code quality expectations
 
@@ -67,9 +77,14 @@ over time.
 
 ## Reporting a vulnerability
 
-Do not open a public issue for a security problem. Use GitHub's private
-vulnerability reporting on this repository ("Security" tab, "Report a
-vulnerability"), and allow reasonable time for a fix before disclosure.
+Security reports do not belong in normal issues or pull requests. Use GitHub's
+private vulnerability reporting on this repository ("Security" tab, "Report a
+vulnerability"), and allow reasonable time for a fix before disclosure. Full
+details in [`SECURITY.md`](SECURITY.md).
+
+## Conduct
+
+Participation is covered by [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md).
 
 ## Contact
 

@@ -1,6 +1,8 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { TrainFront, LogOut } from "lucide-react";
+import { LogOut } from "lucide-react";
+
+import brandSymbol from "@/assets/euroute-symbol.svg.asset.json";
 
 import { Button } from "@/components/ui/button";
 import { useSession } from "@/hooks/useSession";
@@ -28,14 +30,18 @@ export function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/85 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4">
-        <Link to="/" className="flex items-center gap-2.5">
-          <span className="flex size-9 items-center justify-center rounded-md bg-primary text-primary-foreground">
-            <TrainFront className="size-5" />
-          </span>
-          <span className="font-display text-lg leading-none font-semibold">
-            Euroute
-            <span className="block text-[11px] font-normal tracking-wide text-muted-foreground">
-              {t("brand.tagline")}
+        <Link to="/" aria-label="Euroute" className="flex min-w-0 items-center gap-2.5">
+          <img
+            src={brandSymbol.url}
+            alt=""
+            aria-hidden="true"
+            width={40}
+            height={40}
+            className="size-9 shrink-0 rounded-[10px] sm:size-10"
+          />
+          <span className="flex items-center">
+            <span className="font-display text-xl leading-none font-semibold tracking-tight whitespace-nowrap sm:text-2xl">
+              Euroute
             </span>
           </span>
         </Link>

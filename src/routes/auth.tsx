@@ -26,6 +26,8 @@ export const Route = createFileRoute("/auth")({
       },
       { property: "og:title", content: "Logga in – Euroute" },
       { property: "og:description", content: "Spara dina tågresor och dela dem med resekompisen." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: AuthPage,

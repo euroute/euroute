@@ -29,7 +29,7 @@ export const listMyTrips = createServerFn({ method: "GET" })
     const { data, error } = await context.supabase
       .from("saved_trips")
       .select(
-        "id, title, from_name, to_name, depart_at, arrive_at, share_slug, is_shared, created_at, travel_style, is_overnight, overnight_cities, travel_days, changes, duration_minutes, euroute_score",
+        "id, title, from_name, to_name, depart_at, arrive_at, share_slug, is_shared, created_at, travel_style, is_overnight, overnight_cities, travel_days, changes, duration_minutes, euroute_score, depart_zone:itinerary->>departZone, arrive_zone:itinerary->>arriveZone",
       )
       .order("depart_at", { ascending: true, nullsFirst: false });
     if (error) throw dbError(error, "trips");

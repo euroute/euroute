@@ -10,14 +10,12 @@ import {
   upstreamBudget,
 } from "./abuse.server";
 import { planOvernightOptions, type OvernightResult } from "./overnight.server";
+// Single shared Place contract: keeps `intent` and `stopId` alive across the
+// server-function boundary instead of silently stripping them.
+import { PlaceSchema } from "./place-schema";
+import type { RailErrorCode } from "./rail-error";
 
 const OVERNIGHT_LIMIT_PER_MINUTE = 12;
-
-const PlaceSchema = z.object({
-  name: z.string().min(1).max(160),
-  place: z.string().regex(/^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/),
-  country: z.string().max(8).optional(),
-});
 
 const LegSchema = z.object({
   kind: z.enum(["train", "bus", "walk", "other"]),
@@ -86,7 +84,8 @@ export const planOvernight = createServerFn({ method: "POST" })
     if (!limit.ok) {
       return {
         result: null as OvernightResult | null,
-        error: "För många sökningar just nu. Vänta en stund och sök igen.",
+        // Neutral kod, översätts i webbläsaren (samma kontrakt som rail.functions).
+        error: "rate_limited" as RailErrorCode,
       };
     }
     try {
@@ -106,12 +105,12 @@ export const planOvernight = createServerFn({ method: "POST" })
           UPSTREAM_BUDGET_WINDOW_MS,
         ),
       });
-      return { result, error: null as string | null };
+      return { result, error: null as RailErrorCode | null };
     } catch (error) {
       console.error("overnight planning failed", error);
       return {
         result: null as OvernightResult | null,
-        error: "Kunde inte hämta vidareförbindelser för en övernattning just nu.",
+        error: "timetable_unavailable" as RailErrorCode,
       };
     }
   });
