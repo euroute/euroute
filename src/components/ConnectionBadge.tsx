@@ -30,7 +30,7 @@ export function ConnectionBlock({ connection }: { connection: Connection }) {
     <div className="my-2 ml-1 border-l-2 border-dashed border-rail pl-4">
       <p className="text-sm">
         {stationLabel(connection.arriveStation)}
-        {connection.stationChange ? (
+        {connection.namesDiffer ? (
           <span className="text-muted-foreground"> → {stationLabel(connection.departStation)}</span>
         ) : null}
       </p>
@@ -49,6 +49,8 @@ export function ConnectionBlock({ connection }: { connection: Connection }) {
       ) : null}
       {connection.stationChange ? (
         <p className="mt-0.5 text-xs text-muted-foreground">{t("conn.stationChange")}</p>
+      ) : connection.sameComplex && connection.namesDiffer ? (
+        <p className="mt-0.5 text-xs text-muted-foreground">{t("conn.sameComplex")}</p>
       ) : null}
     </div>
   );

@@ -12,7 +12,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useSession } from "@/hooks/useSession";
 import { useI18n } from "@/lib/i18n";
-import { civilDate, civilToIso, placeToString, type Place } from "@/lib/journey";
+import { civilDate, civilToIso, type Place } from "@/lib/journey";
+import { encodeEndpoint, encodeViaList } from "@/lib/search-endpoints";
+import { zoneForPlace } from "@/lib/station-timezone";
 import {
   DEFAULT_PREFERENCES,
   type JourneyPreferences,
@@ -93,21 +95,32 @@ export function SearchForm({
       return;
     }
     const via = values.via.filter((v): v is Place => Boolean(v));
-    // The traveller means 08:00 local railway time, so build the instant with
-    // that date's actual offset instead of trusting the browser's zone.
-    const departAt = civilToIso(values.date, values.time);
+    // The traveller means 08:00 LOCAL CIVIL TIME AT THE ORIGIN station, so the
+    // instant is built with the origin station's zone on that date (DST aware)
+    // – never the browser's or server's zone.
+    const departAt = civilToIso(values.date, values.time, zoneForPlace(values.from.place));
     const prefs = values.preferences;
 
     if (user) {
       persist.mutate({ style: values.style, preferences: prefs });
     }
 
+    const fromParams = encodeEndpoint(values.from);
+    const toParams = encodeEndpoint(values.to);
+    const viaParams = encodeViaList(via);
+
     navigate({
       to: "/sok",
       search: {
-        from: placeToString(values.from),
-        to: placeToString(values.to),
-        via: via.map(placeToString),
+        from: fromParams.value,
+        fromIntent: fromParams.intent,
+        fromId: fromParams.id,
+        to: toParams.value,
+        toIntent: toParams.intent,
+        toId: toParams.id,
+        via: viaParams.via,
+        viaIntent: viaParams.viaIntent,
+        viaId: viaParams.viaId,
         depart: departAt,
         style: values.style,
         minTransfer: prefs.minTransferMinutes,

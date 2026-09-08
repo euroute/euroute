@@ -79,17 +79,17 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Euroute – tågresor i Europa" },
+      { title: "Euroute – planera tågresor genom Europa" },
       {
         name: "description",
         content:
-          "Planera tågresor genom Europa över alla bolag – alla byten, alla operatörer och bokningslänkar per etapp.",
+          "Planera hela din tågresa genom Europa på ett ställe. Jämför resvägar över olika länder och tågbolag och hitta rätt ställe för att boka varje etapp.",
       },
-      { property: "og:title", content: "Euroute – tågresor i Europa" },
+      { property: "og:title", content: "Euroute – planera tågresor genom Europa" },
       {
         property: "og:description",
         content:
-          "Planera tågresor genom Europa över alla bolag – alla byten, alla operatörer och bokningslänkar per etapp.",
+          "Planera hela din tågresa genom Europa på ett ställe. Jämför resvägar över olika länder och tågbolag och hitta rätt ställe för att boka varje etapp.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -101,7 +101,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         rel: "stylesheet",
         href: appCss,
       },
-      { rel: "icon", type: "image/png", href: "/favicon.png" },
+      { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
+      { rel: "icon", type: "image/png", sizes: "64x64", href: "/favicon.png" },
+      { rel: "apple-touch-icon", href: "/favicon.png" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {

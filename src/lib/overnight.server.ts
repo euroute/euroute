@@ -30,6 +30,15 @@ import {
   type OvernightPlan,
   type SplitCandidate,
 } from "./overnight";
+import {
+  selectOptionalCandidates,
+  type OptionalWarning,
+} from "./overnight-optional";
+import {
+  requestedViability,
+  type RequestedViabilityReason,
+  type RequestedViabilityWarning,
+} from "./overnight-viability";
 import { planJourneys } from "./rail.server";
 import type { UpstreamBudget } from "./abuse.server";
 
@@ -40,6 +49,13 @@ export type OvernightResult = {
   recommended: OvernightPlan | null;
   /** Up to two other genuinely good splits. */
   alternatives: OvernightPlan[];
+  /**
+   * Phase C: sensible places to split the journey if the traveller prefers two
+   * days. NOT recommendations – they may take substantially longer. Selected
+   * from plans already built, so they cost no extra timetable searches. Empty
+   * in requested mode and whenever nothing passes `optionalViability`.
+   */
+  optional?: { plan: OvernightPlan; warnings: OptionalWarning[] }[];
   /** Daily travel limit the traveller asked for, in hours (null = none). */
   maxHoursPerDay: number | null;
   /** False when no realistic plan keeps every travel day under that limit. */
@@ -50,6 +66,18 @@ export type OvernightResult = {
   requestedStopUnavailable: string | null;
   /** How many distinct overnight cities were actually compared. */
   comparedCities: number;
+  /**
+   * The traveller's own requested split (Model 2, Phase A). Requested plans
+   * live on their own field and are NEVER placed in `recommended`, so the two
+   * concepts cannot masquerade as each other internally.
+   */
+  requested: OvernightPlan | null;
+  /** Why a requested stop was refused, when it failed viability. */
+  requestedRejection: {
+    station: string;
+    reasons: RequestedViabilityReason[];
+    warnings: RequestedViabilityWarning[];
+  } | null;
 };
 
 const MORNING_SEARCH_HOUR = 6;
@@ -170,6 +198,9 @@ export async function planOvernightOptions(args: {
     closestLongestDayMinutes: 0,
     requestedStopUnavailable: null,
     comparedCities: 0,
+    requested: null,
+    requestedRejection: null,
+    optional: [],
   };
 
   const { consider } = shouldConsiderOvernight({
@@ -287,6 +318,7 @@ export async function planOvernightOptions(args: {
           baseFacts,
           preferences: prefs,
           comparedCities,
+          mode: requested ? "requested" : "recommended",
         }),
       );
     }
@@ -345,6 +377,7 @@ export async function planOvernightOptions(args: {
           baseFacts,
           preferences: prefs,
           comparedCities,
+          mode: requested ? "requested" : "recommended",
         }),
       );
     }
@@ -357,12 +390,85 @@ export async function planOvernightOptions(args: {
     const existing = bestPerCity.get(key);
     if (!existing || plan.score > existing.score) bestPerCity.set(key, plan);
   }
-  const ranked = Array.from(bestPerCity.values()).sort((a, b) => b.score - a.score);
+  // A plan that turns the base journey's night at a station into a real
+  // overnight stay ranks above one that travels through that night to reach a
+  // city with a theoretically longer rest window.
+  const stationNightRank = (p: OvernightPlan) =>
+    p.retainedStationNights > 0 ? 1 : p.convertsStationNightToStay ? -1 : 0;
+  const ranked = Array.from(bestPerCity.values()).sort(
+    (a, b) => stationNightRank(a) - stationNightRank(b) || b.score - a.score,
+  );
+
 
   // When the traveller set a daily travel limit that no realistic plan can
   // meet, lead with the plan that comes closest instead of the highest score.
   if (limitMinutes !== null && !ranked.some((p) => p.meetsMaxPerDay)) {
     ranked.sort((a, b) => a.longestDayMinutes - b.longestDayMinutes || b.score - a.score);
+  }
+
+  /**
+   * REQUESTED PATH (Model 2, Phase B).
+   *
+   * The traveller's city always wins over candidate ranking – we never
+   * substitute another city – but the split must still be a viable two-day
+   * rail journey. Comparative "is this better than continuous?" gates are
+   * skipped; `requestedViability` replaces them. No extra API calls: every
+   * check runs on the plans the requested pipeline already produced.
+   */
+  if (requested) {
+    const evaluated = ranked.map((plan) => ({
+      plan,
+      viability: requestedViability({ plan, base }),
+    }));
+    const viable = evaluated
+      .filter((e) => e.viability.viable)
+      .sort((a, b) => b.plan.score - a.plan.score);
+
+    if (viable.length === 0) {
+      const first = evaluated[0];
+      return {
+        ...empty,
+        considered: true,
+        requestedStopUnavailable: args.requestedStop?.name ?? null,
+        requestedRejection: {
+          station: args.requestedStop?.name ?? "",
+          reasons: first?.viability.reasons ?? [],
+          warnings: first?.viability.warnings ?? [],
+        },
+        comparedCities,
+      };
+    }
+
+    const withConfidence = viable.map(({ plan }) => {
+      const { confidence, tradeoff } = overnightConfidence({
+        plan,
+        base,
+        baseFacts,
+        preferences: prefs,
+        style,
+        requested: true,
+      });
+      return { ...plan, confidence, tradeoff };
+    });
+
+    const closestRequested = viable.reduce(
+      (min, e) => Math.min(min, e.plan.longestDayMinutes),
+      Number.POSITIVE_INFINITY,
+    );
+
+    return {
+      considered: true,
+      recommended: null,
+      requested: withConfidence[0] ?? null,
+      requestedRejection: null,
+      alternatives: withConfidence.slice(1, 3),
+      maxHoursPerDay: prefs.maxTravelHoursPerDay,
+      maxPerDayAchievable: limitMinutes === null || viable.some((e) => e.plan.meetsMaxPerDay),
+      closestLongestDayMinutes: Number.isFinite(closestRequested) ? closestRequested : 0,
+      requestedStopUnavailable: null,
+      comparedCities,
+      optional: [],
+    };
   }
 
   const scored = ranked.map((plan) => {
@@ -389,14 +495,32 @@ export async function planOvernightOptions(args: {
     Number.POSITIVE_INFINITY,
   );
 
+  const recommended = worthwhile[0] ?? null;
+  const alternatives = worthwhile.slice(1, 3);
+
+  /**
+   * OPTIONAL PATH (Phase C). Pure post-processing of plans that already exist:
+   * no additional timetable searches, no change to the recommended gates.
+   * Cities already shown as recommended/alternative are excluded, so a city
+   * never appears twice and "recommended" always wins.
+   */
+  const optional = selectOptionalCandidates({
+    plans: scored,
+    base,
+    exclude: [recommended, ...alternatives].filter(Boolean) as OvernightPlan[],
+  }).map(({ plan, warnings }) => ({ plan, warnings }));
+
   return {
     considered: true,
-    recommended: worthwhile[0] ?? null,
-    alternatives: worthwhile.slice(1, 3),
+    recommended,
+    alternatives,
+    optional,
     maxHoursPerDay: prefs.maxTravelHoursPerDay,
     maxPerDayAchievable: limitMinutes === null || ranked.some((p) => p.meetsMaxPerDay),
     closestLongestDayMinutes: Number.isFinite(closest) ? closest : 0,
     requestedStopUnavailable: null,
     comparedCities,
+    requested: null,
+    requestedRejection: null,
   };
 }

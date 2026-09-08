@@ -1,6 +1,8 @@
 # Euroute
 
-Euroute is an open-source European rail journey planner. You enter where you
+**Official hosted service: <https://euroute.app>**
+
+Euroute is an open-source European train journey planner. You enter where you
 want to travel from and to — optionally with a station you want to change at —
 and Euroute searches across operators and presents complete journeys as a single
 timeline, instead of making you check SJ, DSB, DB and others one at a time.
@@ -59,8 +61,17 @@ provider can be replaced with a self-hosted MOTIS instance or a licensed feed.
 
 ## Local development
 
-Requirements: [Bun](https://bun.sh) (recommended, matches the production
-lockfile) or Node.js 20+ with npm.
+Requirements:
+
+- [Bun](https://bun.sh) — the canonical package manager; `bun.lock` is the
+  committed lockfile. Node.js 20+ with npm also works, but do not commit a
+  generated `package-lock.json`.
+- Your own Supabase project (Postgres + auth). Euroute needs one: accounts,
+  saved trips and sharing all depend on it. Apply the SQL files in
+  `supabase/migrations/` in filename order to get the schema,
+  row-level-security policies and grants.
+- **No key is needed for journey data** — the public Transitous service requires
+  no API key or account.
 
 ```sh
 git clone <this-repository-url>
@@ -72,11 +83,16 @@ bun run dev
 
 The dev server runs on <http://localhost:8080>.
 
-Useful scripts: `bun run build`, `bun run lint`, `bun run format`.
+| Command | Purpose |
+| --- | --- |
+| `bun run dev` | Development server |
+| `bun run test` | Test suite (Vitest) |
+| `bun run lint` | ESLint |
+| `bun run format` | Prettier write |
+| `bun run build` | Production build |
 
-You need your own Supabase project. Apply the migrations in
-`supabase/migrations/` in order to get the schema, row-level-security policies
-and grants.
+More detail: [`docs/development.md`](docs/development.md). How the pieces fit
+together: [`docs/architecture.md`](docs/architecture.md).
 
 ## Environment variables
 
@@ -122,6 +138,12 @@ identity are not licensed for reuse. Forks and derivative deployments must use a
 different name and mark, and must not imply endorsement by or affiliation with
 Euroute. See [`TRADEMARKS.md`](TRADEMARKS.md).
 
-## Contributing
+## Project documents
 
-See [`CONTRIBUTING.md`](CONTRIBUTING.md).
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — how to set up, contribute and review
+- [`SECURITY.md`](SECURITY.md) — how to report a vulnerability privately
+- [`TRADEMARKS.md`](TRADEMARKS.md) — name, logo and brand terms
+- [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md) — dependency licences and attributions
+- [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) — community expectations
+- [`docs/architecture.md`](docs/architecture.md) — how the system fits together
+- [`docs/development.md`](docs/development.md) — setup, commands and deployment

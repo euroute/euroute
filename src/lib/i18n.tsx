@@ -6,8 +6,8 @@ const STORAGE_KEY = "euroute-lang";
 
 type Dict = Record<string, string>;
 
-const sv: Dict = {
-  "brand.tagline": "tågresor i Europa",
+export const sv: Dict = {
+  "brand.tagline": "Planera tågresan",
   "nav.search": "Sök resa",
   "nav.myTrips": "Mina resor",
   "nav.signOut": "Logga ut",
@@ -30,26 +30,26 @@ const sv: Dict = {
   "form.minutesN": "{n} min",
   "form.submit": "Hitta tågresor",
   "form.addVia": "Lägg till mellanstopp",
-  "form.viaHint": "Vet du var du vill byta? Lägg till stopp – vi kedjar etapperna åt dig.",
+  "form.viaHint": "Vet du var du vill byta? Lägg till stopp så kedjar vi etapperna åt dig.",
   "form.missingStations": "Välj både startstation och slutstation i listan.",
 
   "home.h1": "Hela tågresan genom Europa – i en enda sökning.",
   "home.lead":
-    "Slipp hoppa mellan SJ, DSB och DB. Fyll i var du ska, lägg till byten du vill göra, och få en tydlig överblick över dina alternativ med länkar till varje biljett.",
+    "Planera hela din tågresa genom Europa på ett ställe. Euroute samlar resan över olika länder och tågbolag, visar de bästa alternativen och hjälper dig vidare till rätt ställe för att boka varje etapp.",
   "home.featuresTitle": "Byggd för långa tågresor",
   "home.f1.title": "Alla bolag i en sökning",
   "home.f1.text":
-    "Vi kombinerar tidtabeller över hela Europa, oavsett om etappen körs av SJ, DSB, DB eller ÖBB.",
+    "Vi kombinerar tidtabeller över hela Europa, oavsett om etappen körs av t.ex. SJ, DSB, DB eller Trenitalia.",
   "home.f2.title": "Egna mellanstopp",
   "home.f2.text":
-    "Vet du att du vill byta i Hamburg eller København? Lägg till stoppet – vi kedjar etapperna.",
+    "Vet du att du vill byta i Hamburg eller Köpenhamn? Lägg till stoppet så kedjar vi etapperna.",
   "home.f3.title": "Smart rangordning",
-  "home.f3.text": "Berätta hur du vill resa – vi rangordnar förslagen och varnar för korta byten.",
+  "home.f3.text": "Berätta hur du vill resa så rangordnar vi förslagen och varnar för korta byten.",
   "home.f4.title": "Boka etapp för etapp",
   "home.f4.text": "Varje etapp får en direktlänk till rätt bolag, så du slipper leta själv.",
-  "home.saveTitle": "Spara dina reseplaner",
+  "home.saveTitle": "Spara och dela dina reseplaner",
   "home.saveText":
-    "Med ett konto sparar du hela reseplanen med alla etapper – och kan dela den med resekompisen via länk.",
+    "Med ett konto sparar du hela reseplanen med alla etapper och kan enkelt dela den med resekompisen via länk.",
   "home.createAccount": "Skapa konto",
   "footer.note":
     "Tidtabellsdata från öppna europeiska datakällor via Transitous. Kontrollera alltid tider och villkor hos tågbolaget innan du bokar.",
@@ -69,9 +69,16 @@ const sv: Dict = {
   "search.via": " · via {list}",
   "search.loading": "Söker tidtabeller i hela Europa …",
   "search.failedTitle": "Sökningen gick inte igenom",
+  "railError.timetableUnavailable":
+    "Tidtabellstjänsten kunde inte svara för den här sträckan. Prova en närliggande station eller ett annat datum.",
+  "railError.rateLimited": "För många sökningar just nu. Vänta en stund och sök igen.",
+  "railError.stationSearchFailed": "Kunde inte söka stationer just nu.",
   "search.emptyTitle": "Inga resor hittades",
   "search.emptyText":
     "Prova en större station i närheten, ett annat datum eller fler tillåtna byten.",
+  "search.unusableTitle": "Inga realistiska byten hittades",
+  "search.unusableText":
+    "Vi hittade resor, men ingen med byten som vi bedömer som tillräckligt realistiska.",
   "search.saveTrip": "Spara reseplan",
   "search.signInToSave": "för att spara den här reseplanen.",
   "search.editSearch": "Ändra sökningen",
@@ -140,6 +147,10 @@ const sv: Dict = {
   "book.markBooked": "Markera som bokad",
   "book.bookedMark": "Markerad som bokad",
   "book.markFailed": "Kunde inte uppdatera bokningsstatus.",
+  "booking.open": "Öppna {operator}",
+  "booking.bookWith": "Boka hos {operator}",
+  "booking.local": "Lokaltrafik – biljett köps enligt lokala villkor.",
+  "booking.none": "Bokningslänk saknas för den här etappen.",
   "book.openTimes": "Se tider & boka",
   "book.atOperator": "Boka hos {operator}",
   "book.nightIn": "Natt i {city} · ankomst {arr}, vidare {dep}",
@@ -179,8 +190,8 @@ const sv: Dict = {
   "style.title": "Hur vill du resa?",
   "style.recommended": "Rekommenderad",
   "style.recommended.desc": "Bästa balans mellan restid, byten och enkelhet.",
-  "style.fastest": "Snabbast",
-  "style.fastest.desc": "Kortast total restid.",
+  "style.fastest": "Tidigast framme",
+  "style.fastest.desc": "Kommer fram tidigast från din valda avgångstid.",
   "style.comfortable": "Bekväm",
   "style.comfortable.desc": "Färre byten och tryggare bytesmarginaler.",
   "style.scenic": "Naturskön",
@@ -217,22 +228,40 @@ const sv: Dict = {
 
   "score.extreme": "Extra lång resa",
   "reason.direct": "Direkttåg hela vägen – inga byten att missa.",
-  "reason.fastestAndSafe": "Kortast restid i den här sökningen och gott om tid vid varje byte.",
+  "reason.fastestAndSafe":
+    "Tidigast framme och kortast restid i den här sökningen, med gott om tid vid varje byte.",
   "reason.balanced": "Bästa kombinationen av restid, byten och bekväma anslutningar.",
   "reason.fewChangesSafe": "Bara {n} byten och gott om tid vid varje byte.",
+  "reason.fewChangesSmallCost": "Bara {n} byten utan stor tidsförlust.",
+  "reason.directNearlyFast": "Direkt och nästan lika tidigt framme som bästa alternativet.",
+  "reason.earliestArrival": "Tidigast framme av resorna från din avgångstid.",
+  "reason.earliestArrivalSafe": "Tidigast framme, med gott om tid vid varje byte.",
   "reason.safeConnections": "Gott om tid vid varje byte, med rimlig restid.",
   "reason.fastest": "Kortast restid i den här sökningen.",
+
+  // Bekväm-profilen (F4B)
+  "reason.comfortDirect": "Direkttåg hela vägen – inga byten att missa.",
+  "reason.comfortSafeConnections": "Tryggare byten – gott om tid vid varje byte.",
+  "reason.comfortFewerRisky": "Färre riskfyllda byten än de andra alternativen.",
+  "reason.comfortFewerTight": "Färre korta byten än de andra alternativen.",
+  "reason.comfortFewerChanges": "Enklare resa med bara {n} byten.",
+  "reason.comfortNoStationChange": "Inga stationsbyten – du byter tåg på samma station.",
+  "reason.comfortSimpleSmallCost": "Bekvämare byten utan stor tidsförlust.",
+  "reason.comfortSimplest": "Den enklaste resan i den här sökningen – se anmärkningarna nedan.",
+
+
   "reason.bestAvailable":
     "Bästa tillgängliga resan för den här sökningen – observera anmärkningarna nedan.",
   "cat.fewerChanges": "Färre byten",
   "cat.saferConnections": "Tryggare byten",
   "cat.laterDeparture": "Senare avgång",
   "cat.earlierArrival": "Tidigare framme",
-  "cat.alsoFastest": "Även snabbast",
-  "hl.muchLonger": "{time} längre än snabbaste resan",
+  "cat.alsoFastest": "Även kortast restid",
+  "hl.muchLonger": "{time} längre än den kortaste resan",
   "cat.recommended": "Rekommenderad",
-  "cat.fastest": "Snabbast",
+  "cat.fastest": "Tidigast framme",
   "cat.comfortable": "Bekväm",
+  "cat.mostComfortable": "Bekvämast",
 
   "conn.comfortable": "Gott om tid för bytet",
   "conn.tight": "Kort tid för bytet",
@@ -241,6 +270,7 @@ const sv: Dict = {
   "conn.longWait": "Lång väntetid ({time})",
   "conn.recommend": "Vi rekommenderar minst {min} minuter för det här bytet.",
   "conn.stationChange": "Byte av station inom staden",
+  "conn.sameComplex": "Byte inom samma stationsområde",
 
   "option.view": "Visa resan",
   "option.hide": "Dölj detaljer",
@@ -269,7 +299,9 @@ const sv: Dict = {
   "prefs.allowOvernightStop": "Föreslå övernattning på vägen",
 
   "on.loading": "Vi kontrollerar om resan blir bättre med en övernattning …",
-  "on.title": "Ett bekvämare sätt att resa",
+  "on.title": "Smart övernattning",
+  "on.titleRequested": "Ditt uppehåll",
+  "on.intro": "Dela resan i två dagar och få en riktig nattpaus i {city}.",
   "on.split": "Dela resan i {city}",
   "on.view": "Visa övernattningsresan",
   "on.hide": "Dölj övernattningsresan",
@@ -283,7 +315,8 @@ const sv: Dict = {
   "on.summary": "{days} resdagar · längsta resdag {longest} · {changes} byten",
   "on.added": "{time} längre restid på tåg än att resa utan uppehåll",
   "on.addedNone": "Ingen extra tid på tåg jämfört med att resa utan uppehåll",
-  "on.benefitsTitle": "Det här vinner du",
+  "on.benefitsTitle": "Fördelar",
+  "on.warningsTitle": "Att känna till",
   "on.others": "Andra övernattningsalternativ",
   "on.otherOption": "Övernatta i {city}",
   "on.chooseTitle": "Jag vill övernatta i:",
@@ -291,6 +324,27 @@ const sv: Dict = {
   "on.chooseSubmit": "Planera med det här stoppet",
   "on.chooseClear": "Rensa stoppet",
   "on.unavailable": "Vi hittade ingen resa som fungerar för en övernattning i {city}.",
+  "on.rejected.title":
+    "Ett uppehåll i {city} blir ingen bra uppdelning av den här resan på två dagar.",
+  "on.rejected.insufficientDay1":
+    "Första resdagen blir för kort för att det här ska bli en meningsfull uppdelning.",
+  "on.rejected.extremeTravelDay": "Minst en av resdagarna blir fortfarande orimligt lång.",
+  "on.rejected.restTooShort": "Det blir för lite tid för en riktig nattpaus.",
+  "on.rejected.restTooLong":
+    "Uppehållet blir för långt för att fungera som en normal övernattning.",
+  "on.rejected.noUsableDeparture": "Vi hittar ingen lämplig vidare resa nästa morgon.",
+  "on.rejected.arrivalTooLate":
+    "Du kommer fram för sent för att det ska bli en bra övernattning.",
+  "on.rejected.missingRailDay": "Uppdelningen ger inte två riktiga resdagar med tåg.",
+  "on.rejected.materialDetour": "Stoppet gör resan alltför omständig.",
+  "on.optional.title": "Vill du dela upp resan?",
+  "on.optional.intro":
+    "De här stoppen gör resan längre, men kan ge två mer hanterbara resdagar.",
+  "on.optional.day1": "Dag 1: {time}",
+  "on.optional.night": "Natt: {time}",
+  "on.optional.day2": "Dag 2: {time}",
+  "on.optional.extra": "+{time} total restid",
+  "on.optional.cta": "Övernatta i {city}",
   "on.limitMissed": "Vi hittade ingen resa där alla resdagar håller sig under {h} timmar.",
   "on.limitClosest": "Närmaste alternativ: längsta resdagen är {time}.",
   "on.noneFound":
@@ -314,8 +368,8 @@ const sv: Dict = {
   "on.reason.balanced": "{city} delar resan i två hanterbara resdagar ({d1} och {d2}).",
   "on.reason.shorterDays": "Med stopp i {city} blir längsta resdagen {time}.",
 
-  "on.badgeAlt": "Dela resan på vägen",
-  "on.headingAlt": "Resan kan delas i {city}",
+  "on.badgeAlt": "Smart övernattning",
+  "on.headingAlt": "Övernatta i {city}",
   "on.showDetails": "Visa detaljer",
   "on.hideDetails": "Dölj detaljer",
   "on.dayHeading": "Dag {n}",
@@ -325,9 +379,25 @@ const sv: Dict = {
   "on.nightArrival": "Ankomst {time}",
   "on.nightDeparture": "Nästa dags avgång {time}",
   "on.betweenTrains": "{time} mellan tågen",
+  "on.nightTimes": "Ankomst {arr} · Avgång nästa morgon {dep}",
+  "on.nightDuration": "{time} för natten i {city}",
   "on.whyCity": "Varför {city}?",
   "on.trainTime": "{time} på tåg",
+  "search.saveOvernight": "Spara resan med övernattning",
+  "on.summaryTitle": "Resan dag för dag",
+  "on.nightShort": "Natt",
+  "on.cost.later": "Du kommer fram {time} senare än om du fortsätter utan övernattning.",
+  "on.cost.same": "Ungefär samma ankomsttid som utan övernattning.",
+  "on.requestedIntro": "Du har valt att dela resan med en natt i {city}.",
+  "on.aboutPlan": "Om resplanen",
+  "on.chooseAnother": "Välj ett annat stopp",
+  "on.unavailableBuild":
+    "Vi kunde inte bygga en fungerande tvådagarsresa via {city} för den här dagen. Prova ett annat stopp.",
+  "on.stationNightIntro":
+    "Din ursprungliga resa har {time} väntan här under natten. Med en övernattning får du en riktig nattpaus i stället.",
 
+  "on.benefit.stationNightToStay": "Riktig nattpaus i {city}",
+  "on.benefit.realNightRest": "Riktig nattpaus före nästa resdag",
   "on.benefit.rest.veryGood": "Gott om tid för kväll och natt före nästa resdag",
   "on.benefit.rest.good": "Rimlig övernattning innan nästa resdag",
   "on.benefit.manageableDays": "Hanterbara resdagar (längst {time})",
@@ -339,7 +409,11 @@ const sv: Dict = {
   "on.warn.rest.short": "Kort övernattning ({arrival}–{departure})",
   "on.warn.rest.poor": "Lite tid för vila ({arrival}–{departure})",
   "on.warn.stillNightTravel": "Resan går fortfarande delvis genom natten",
+  "on.warn.stationNight": "Resan innehåller fortfarande en natt med väntan på stationen",
   "on.warn.addedTime": "{time} längre restid än utan uppehåll",
+  "on.warn.addedElapsed":
+    "Du kommer fram cirka {time} senare än om du fortsätter utan övernattning",
+  "on.warn.stationChange1": "1 stationsbyte",
   "on.warn.stationChange": "{n} stationsbyten",
   "on.warn.overLimit": "Längsta resdagen är {time}, över din gräns på {h} timmar",
 
@@ -348,11 +422,18 @@ const sv: Dict = {
     "Du slipper resa genom natten, men får en lång resdag {n} ({time}).",
   "on.tradeoff.risky": "Resan innehåller fortfarande ett kort byte.",
   "on.tradeoff.rest": "Övernattningen ger begränsad tid för vila.",
+  "on.tradeoff.stationNight": "Resan innehåller fortfarande en natt med väntan på stationen.",
   "on.tradeoff.overLimit": "Längsta resdagen blir {time}, över din gräns på {h} timmar.",
   "on.tradeoff.addedTime": "Uppdelningen kostar {time} extra restid.",
+  "on.tradeoff.addedElapsed":
+    "Du kommer fram cirka {time} senare än om du fortsätter utan övernattning.",
 
   "on.reason.bestOfCompared":
-    "{city} ger den bästa helheten av de {n} övernattningsstopp vi jämförde – resdagarnas längd, nattvila och vidareförbindelser vägda samman.",
+    "Av de {n} stopp vi jämförde ger {city} den bästa balansen mellan nattvila och fortsatt resa.",
+  "on.reason.stationNight":
+    "Din ursprungliga resa har redan {time} väntan här under natten. Med en övernattning får du en riktig nattpaus utan att behöva vänta natten på stationen.",
+  "on.reason.stationNightCompared":
+    "Av de {n} stopp vi jämförde ger {city} den bästa balansen mellan nattvila och fortsatt resa.",
 
   "nav.account": "Konto",
   "footer.noTickets":
@@ -382,7 +463,7 @@ const sv: Dict = {
     "Vi använder inga annons- eller analyskakor. Webbläsaren sparar din inloggningssession och ditt språkval – inget annat.",
   "privacy.contact.title": "Kontakt",
   "privacy.contact.text":
-    "För frågor om dina personuppgifter, eller för att använda dina rättigheter, kontakta den ansvariga för Euroute: [lägg in din kontaktadress].",
+    "För frågor om dina personuppgifter, eller för att använda dina rättigheter, kontakta den ansvariga för Euroute: info@euroute.app.",
 
   "account.h1": "Mitt konto",
   "account.lead": "Dina inloggningsuppgifter, en kopia av dina uppgifter och permanent radering.",
@@ -403,8 +484,8 @@ const sv: Dict = {
   "account.deleteFailed": "Kunde inte radera kontot. Försök igen.",
 };
 
-const en: Dict = {
-  "brand.tagline": "train travel across Europe",
+export const en: Dict = {
+  "brand.tagline": "Plan your trip",
   "nav.search": "Search trip",
   "nav.myTrips": "My trips",
   "nav.signOut": "Sign out",
@@ -427,27 +508,27 @@ const en: Dict = {
   "form.minutesN": "{n} min",
   "form.submit": "Find train trips",
   "form.addVia": "Add stopover",
-  "form.viaHint": "Know where you want to change? Add a stop – we chain the legs for you.",
+  "form.viaHint": "Know where you want to change trains? Add stops and we'll connect the legs for you.",
   "form.missingStations": "Pick both an origin and a destination from the list.",
 
   "home.h1": "Your whole European train journey – in a single search.",
   "home.lead":
-    "No more hopping between SJ, DSB and DB. Enter where you're going, add the changes you want, and get a clear overview of your options with a link for every ticket.",
+    "Plan your entire train journey through Europe in one place. Euroute brings together the journey across different countries and train operators, shows you the best options, and helps you continue to the right place to book each leg.",
   "home.featuresTitle": "Built for long train journeys",
-  "home.f1.title": "Every operator in one search",
+  "home.f1.title": "All operators in one search",
   "home.f1.text":
-    "We combine timetables across Europe, whether the leg is run by SJ, DSB, DB or ÖBB.",
-  "home.f2.title": "Your own stopovers",
+    "We combine timetables across Europe, whether a leg is operated by SJ, DSB, DB, Trenitalia or another operator.",
+  "home.f2.title": "Choose your own stops",
   "home.f2.text":
-    "Know you want to change in Hamburg or Copenhagen? Add the stop – we chain the legs together.",
+    "Know you want to change trains in Hamburg or Copenhagen? Add the stop and we'll connect the legs for you.",
   "home.f3.title": "Smart ranking",
   "home.f3.text":
-    "Tell us how you like to travel – we rank the options and flag tight connections.",
-  "home.f4.title": "Book leg by leg",
-  "home.f4.text": "Every leg gets a direct link to the right operator, so you don't have to hunt.",
-  "home.saveTitle": "Save your travel plans",
+    "Tell us how you want to travel and we'll rank the options and warn you about short connections.",
+  "home.f4.title": "Book each leg separately",
+  "home.f4.text": "Each leg gets a direct link to the right operator, so you don't have to search for it yourself.",
+  "home.saveTitle": "Save and share your travel plans",
   "home.saveText":
-    "With an account you can save the full plan with every leg – and share it with your travel companion via a link.",
+    "With an account, you can save your entire travel plan with all its legs and easily share it with your travel companion via a link.",
   "home.createAccount": "Create account",
   "footer.note":
     "Timetable data from open European sources via Transitous. Always double-check times and conditions with the operator before booking.",
@@ -467,8 +548,15 @@ const en: Dict = {
   "search.via": " · via {list}",
   "search.loading": "Searching timetables across Europe …",
   "search.failedTitle": "The search didn't go through",
+  "railError.timetableUnavailable":
+    "The timetable service could not answer for this route. Try a nearby station or another date.",
+  "railError.rateLimited": "Too many searches right now. Wait a moment and search again.",
+  "railError.stationSearchFailed": "Could not search for stations right now.",
   "search.emptyTitle": "No trips found",
   "search.emptyText": "Try a larger nearby station, another date, or allow more changes.",
+  "search.unusableTitle": "No realistic connections found",
+  "search.unusableText":
+    "We found journeys, but none with connections we consider realistic enough.",
   "search.saveTrip": "Save travel plan",
   "search.signInToSave": "to save this travel plan.",
   "search.editSearch": "Edit search",
@@ -537,6 +625,10 @@ const en: Dict = {
   "book.markBooked": "Mark as booked",
   "book.bookedMark": "Marked as booked",
   "book.markFailed": "Couldn't update the booking status.",
+  "booking.open": "Open {operator}",
+  "booking.bookWith": "Book with {operator}",
+  "booking.local": "Local transit – ticketing follows local rules.",
+  "booking.none": "No reliable booking link is available for this leg.",
   "book.openTimes": "See times & book",
   "book.atOperator": "Book with {operator}",
   "book.nightIn": "Night in {city} · arrive {arr}, continue {dep}",
@@ -576,8 +668,8 @@ const en: Dict = {
   "style.title": "How would you like to travel?",
   "style.recommended": "Recommended",
   "style.recommended.desc": "Best overall balance of time, changes and simplicity.",
-  "style.fastest": "Fastest",
-  "style.fastest.desc": "Shortest total journey time.",
+  "style.fastest": "Earliest arrival",
+  "style.fastest.desc": "Gets you there earliest from your selected departure time.",
   "style.comfortable": "Comfortable",
   "style.comfortable.desc": "Fewer changes and safer connection margins.",
   "style.scenic": "Scenic",
@@ -615,21 +707,38 @@ const en: Dict = {
   "score.extreme": "Extra long journey",
   "reason.direct": "A direct train all the way – no connections to miss.",
   "reason.fastestAndSafe":
-    "Shortest travel time in this search, with plenty of time at every change.",
+    "Arrives first and has the shortest journey in this search, with plenty of time at every change.",
   "reason.balanced": "The best combination of travel time, changes and comfortable connections.",
   "reason.fewChangesSafe": "Only {n} changes and plenty of time at each one.",
+  "reason.fewChangesSmallCost": "Only {n} changes, at little cost in time.",
+  "reason.directNearlyFast": "Direct and arrives almost as early as the best option.",
+  "reason.earliestArrival": "Arrives first of the journeys from your departure time.",
+  "reason.earliestArrivalSafe": "Arrives first, with plenty of time at every change.",
   "reason.safeConnections": "Plenty of time at every change, with a reasonable travel time.",
   "reason.fastest": "Shortest travel time in this search.",
+
+  // Comfortable profile (F4B)
+  "reason.comfortDirect": "A direct train all the way – no connections to miss.",
+  "reason.comfortSafeConnections": "Safer connections – plenty of time at every change.",
+  "reason.comfortFewerRisky": "Fewer risky connections than the other options.",
+  "reason.comfortFewerTight": "Fewer tight connections than the other options.",
+  "reason.comfortFewerChanges": "A simpler journey with only {n} changes.",
+  "reason.comfortNoStationChange": "No station changes – you change trains at the same station.",
+  "reason.comfortSimpleSmallCost": "More comfortable connections without a large time penalty.",
+  "reason.comfortSimplest": "The simplest journey in this search – note the remarks below.",
+
+
   "reason.bestAvailable": "The best journey available for this search – note the remarks below.",
   "cat.fewerChanges": "Fewer changes",
   "cat.saferConnections": "Safer connections",
   "cat.laterDeparture": "Later departure",
   "cat.earlierArrival": "Arrives earlier",
-  "cat.alsoFastest": "Also fastest",
-  "hl.muchLonger": "{time} longer than the fastest journey",
+  "cat.alsoFastest": "Also shortest journey",
+  "hl.muchLonger": "{time} longer than the shortest journey",
   "cat.recommended": "Recommended",
-  "cat.fastest": "Fastest",
+  "cat.fastest": "Earliest arrival",
   "cat.comfortable": "Comfortable",
+  "cat.mostComfortable": "Most comfortable",
 
   "conn.comfortable": "Plenty of time to change",
   "conn.tight": "Short time to change",
@@ -638,6 +747,7 @@ const en: Dict = {
   "conn.longWait": "Long wait ({time})",
   "conn.recommend": "We recommend at least {min} minutes for this connection.",
   "conn.stationChange": "Change of station within the city",
+  "conn.sameComplex": "Transfer within the same station complex",
 
   "option.view": "View journey",
   "option.hide": "Hide details",
@@ -666,7 +776,9 @@ const en: Dict = {
   "prefs.allowOvernightStop": "Suggest an overnight stop on the way",
 
   "on.loading": "Checking whether an overnight stop would improve this journey …",
-  "on.title": "A more comfortable way to travel",
+  "on.title": "Smart overnight",
+  "on.titleRequested": "Your stopover",
+  "on.intro": "Split the journey across two days and get a proper night's rest in {city}.",
   "on.split": "Split the journey in {city}",
   "on.view": "Show the overnight journey",
   "on.hide": "Hide the overnight journey",
@@ -680,7 +792,8 @@ const en: Dict = {
   "on.summary": "{days} travel days · longest day {longest} · {changes} changes",
   "on.added": "{time} more time on trains than travelling straight through",
   "on.addedNone": "No extra time on trains compared with travelling straight through",
-  "on.benefitsTitle": "What you gain",
+  "on.benefitsTitle": "Benefits",
+  "on.warningsTitle": "Worth noting",
   "on.others": "Other overnight options",
   "on.otherOption": "Stay in {city}",
   "on.chooseTitle": "I want to stay overnight in:",
@@ -688,6 +801,24 @@ const en: Dict = {
   "on.chooseSubmit": "Plan with this stop",
   "on.chooseClear": "Clear the stop",
   "on.unavailable": "We found no journey that works for an overnight stop in {city}.",
+  "on.rejected.title": "An overnight stop in {city} doesn't make a good two-day split of this journey.",
+  "on.rejected.insufficientDay1":
+    "The first travel day would be too short for this split to be worthwhile.",
+  "on.rejected.extremeTravelDay": "At least one of the travel days would still be unreasonably long.",
+  "on.rejected.restTooShort": "There would be too little time for a proper night's rest.",
+  "on.rejected.restTooLong": "The stop would be too long to work as a normal overnight stay.",
+  "on.rejected.noUsableDeparture": "We can't find a suitable onward journey the next morning.",
+  "on.rejected.arrivalTooLate": "You'd arrive too late for this to be a good overnight stop.",
+  "on.rejected.missingRailDay": "The split doesn't give you two real travel days by train.",
+  "on.rejected.materialDetour": "The stop makes the journey far too roundabout.",
+  "on.optional.title": "Want to split the journey?",
+  "on.optional.intro":
+    "These stops make the journey longer, but can give you two more manageable travel days.",
+  "on.optional.day1": "Day 1: {time}",
+  "on.optional.night": "Night: {time}",
+  "on.optional.day2": "Day 2: {time}",
+  "on.optional.extra": "+{time} total travel time",
+  "on.optional.cta": "Stay overnight in {city}",
   "on.limitMissed": "We found no journey where every travel day stays under {h} hours.",
   "on.limitClosest": "Closest alternative: the longest travel day is {time}.",
   "on.noneFound":
@@ -711,8 +842,8 @@ const en: Dict = {
   "on.reason.balanced": "{city} splits the journey into two manageable days ({d1} and {d2}).",
   "on.reason.shorterDays": "With a stop in {city} the longest travel day becomes {time}.",
 
-  "on.badgeAlt": "Split the journey on the way",
-  "on.headingAlt": "The journey can be split in {city}",
+  "on.badgeAlt": "Smart overnight",
+  "on.headingAlt": "Stay overnight in {city}",
   "on.showDetails": "Show details",
   "on.hideDetails": "Hide details",
   "on.dayHeading": "Day {n}",
@@ -722,9 +853,25 @@ const en: Dict = {
   "on.nightArrival": "Arrival {time}",
   "on.nightDeparture": "Next day's departure {time}",
   "on.betweenTrains": "{time} between trains",
+  "on.nightTimes": "Arrive {arr} · Depart next morning {dep}",
+  "on.nightDuration": "{time} overnight in {city}",
   "on.whyCity": "Why {city}?",
   "on.trainTime": "{time} on trains",
+  "search.saveOvernight": "Save the overnight itinerary",
+  "on.summaryTitle": "Your journey day by day",
+  "on.nightShort": "Night",
+  "on.cost.later": "You arrive {time} later than if you continue without an overnight stop.",
+  "on.cost.same": "About the same arrival time as without an overnight stop.",
+  "on.requestedIntro": "You've chosen to split the journey with a night in {city}.",
+  "on.aboutPlan": "About this itinerary",
+  "on.chooseAnother": "Choose another stop",
+  "on.unavailableBuild":
+    "We couldn't build a working two-day journey via {city} for this date. Try another stop.",
+  "on.stationNightIntro":
+    "Your original journey has a {time} overnight wait here. Staying overnight turns it into a proper night's rest.",
 
+  "on.benefit.stationNightToStay": "A proper night's rest in {city}",
+  "on.benefit.realNightRest": "A proper night's rest before the next travel day",
   "on.benefit.rest.veryGood":
     "Plenty of time for an evening and a night before the next travel day",
   "on.benefit.rest.good": "A reasonable overnight window before the next travel day",
@@ -737,7 +884,11 @@ const en: Dict = {
   "on.warn.rest.short": "Short overnight window ({arrival}–{departure})",
   "on.warn.rest.poor": "Little time to rest ({arrival}–{departure})",
   "on.warn.stillNightTravel": "Part of the journey still runs through the night",
+  "on.warn.stationNight": "The journey still contains a night waiting at a station",
   "on.warn.addedTime": "{time} longer than travelling straight through",
+  "on.warn.addedElapsed":
+    "You arrive about {time} later than if you continue without an overnight stop",
+  "on.warn.stationChange1": "1 station change",
   "on.warn.stationChange": "{n} station changes",
   "on.warn.overLimit": "The longest travel day is {time}, above your {h} hour limit",
 
@@ -746,11 +897,18 @@ const en: Dict = {
     "You avoid travelling through the night, but get a long travel day {n} ({time}).",
   "on.tradeoff.risky": "The journey still contains a short connection.",
   "on.tradeoff.rest": "The overnight stop leaves limited time to rest.",
+  "on.tradeoff.stationNight": "The journey still contains a night waiting at a station.",
   "on.tradeoff.overLimit": "The longest travel day becomes {time}, above your {h} hour limit.",
   "on.tradeoff.addedTime": "The split costs {time} of extra travel time.",
+  "on.tradeoff.addedElapsed":
+    "You arrive about {time} later than if you continue without an overnight stop.",
 
   "on.reason.bestOfCompared":
-    "{city} gives the best overall result of the {n} overnight stops we compared – travel-day lengths, night rest and onward connections weighed together.",
+    "Of the {n} stops we compared, {city} gives the best balance between night rest and the onward journey.",
+  "on.reason.stationNight":
+    "Your original journey already has a {time} overnight wait here. Staying overnight gives you a proper night's rest instead of spending the night waiting at the station.",
+  "on.reason.stationNightCompared":
+    "Of the {n} stops we compared, {city} gives the best balance between night rest and the onward journey.",
 
   "nav.account": "Account",
   "footer.noTickets":
@@ -780,7 +938,7 @@ const en: Dict = {
     "We use no advertising or analytics cookies. The browser stores your login session and your language choice – nothing else.",
   "privacy.contact.title": "Contact",
   "privacy.contact.text":
-    "For questions about your personal data, or to exercise your rights, contact the person responsible for Euroute: [add your contact email].",
+    "For questions about your personal data, or to exercise your rights, contact the person responsible for Euroute: info@euroute.app.",
 
   "account.h1": "My account",
   "account.lead": "Your login details, a copy of your data, and permanent deletion.",
@@ -805,7 +963,7 @@ const DICTS: Record<Lang, Dict> = { sv, en };
 
 export type Translate = (key: string, vars?: Record<string, string | number>) => string;
 
-function translate(lang: Lang, key: string, vars?: Record<string, string | number>): string {
+export function translate(lang: Lang, key: string, vars?: Record<string, string | number>): string {
   const template = DICTS[lang][key] ?? DICTS.sv[key] ?? key;
   if (!vars) return template;
   return template.replace(/\{(\w+)\}/g, (_, name: string) => String(vars[name] ?? `{${name}}`));

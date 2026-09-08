@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 import { formatClock, formatDuration } from "@/lib/journey";
+import { journeyArrivalZone, journeyDepartureZone } from "@/lib/station-timezone";
 import { transitLegs, type JourneyOption } from "@/lib/journey-intelligence";
 
 type Props = {
@@ -28,7 +29,9 @@ export function JourneyOptionCard({ option, minTransferMinutes, action, defaultO
   const { t } = useI18n();
   const [open, setOpen] = useState(Boolean(defaultOpen));
   const { journey, facts, score, breakdown, highlights, category, reason, alsoFastest } = option;
-  const isRecommended = category === "recommended";
+  // The top card of the active profile gets the emphasised treatment,
+  // whichever profile label it carries.
+  const isRecommended = Boolean(option.primary) || category === "recommended";
   const stations = routeStations(journey);
   const warnings = highlights.filter((h) => h.tone === "warn");
   const goods = highlights.filter((h) => h.tone === "good");
@@ -51,7 +54,7 @@ export function JourneyOptionCard({ option, minTransferMinutes, action, defaultO
               {t(`cat.${category}`)}
             </Badge>
           ) : null}
-          {alsoFastest && !isRecommended && category !== "fastest" ? (
+          {alsoFastest && category !== "fastest" ? (
             <Badge variant="outline">{t("cat.alsoFastest")}</Badge>
           ) : null}
         </div>
@@ -64,7 +67,8 @@ export function JourneyOptionCard({ option, minTransferMinutes, action, defaultO
 
         <p className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
           <span className="clock font-medium">
-            {formatClock(journey.departure)} – {formatClock(journey.arrival)}
+            {formatClock(journey.departure, journeyDepartureZone(journey))} –{" "}
+            {formatClock(journey.arrival, journeyArrivalZone(journey))}
           </span>
           <span className="inline-flex items-center gap-1.5">
             <Clock className="size-3.5 text-muted-foreground" />

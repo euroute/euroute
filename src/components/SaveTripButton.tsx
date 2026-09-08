@@ -14,13 +14,15 @@ type Props = {
   /** Built on demand so the snapshot is created at the moment of saving. */
   buildPlan: () => TripPlan;
   searchParams?: Record<string, unknown>;
+  /** Overrides the button copy so it is clear WHICH itinerary is saved. */
+  label?: string;
 };
 
 /**
  * One save action for every journey card. Signed-out visitors keep the plan in
  * the session and it is stored automatically right after they sign in.
  */
-export function SaveTripButton({ buildPlan, searchParams }: Props) {
+export function SaveTripButton({ buildPlan, searchParams, label }: Props) {
   const { user } = useSession();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -55,7 +57,7 @@ export function SaveTripButton({ buildPlan, searchParams }: Props) {
         }}
       >
         <Bookmark className="size-4" />
-        {t("search.saveTrip")}
+        {label ?? t("search.saveTrip")}
       </Button>
     );
   }
@@ -75,7 +77,7 @@ export function SaveTripButton({ buildPlan, searchParams }: Props) {
       ) : (
         <Bookmark className="size-4" />
       )}
-      {save.isSuccess ? t("save.savedShort") : t("search.saveTrip")}
+      {save.isSuccess ? t("save.savedShort") : (label ?? t("search.saveTrip"))}
     </Button>
   );
 }

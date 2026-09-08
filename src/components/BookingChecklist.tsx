@@ -2,10 +2,18 @@ import { ArrowUpRight, Check, MoonStar, Train } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { bookingActionLabelKey } from "@/lib/booking-actions";
 import { useI18n } from "@/lib/i18n";
 import { formatClock, formatDay, formatDuration } from "@/lib/journey";
 import { trackBookingClick } from "@/lib/trips.functions";
-import type { TripPlan, TripSegment } from "@/lib/trip-plan";
+import {
+  dayDepartureZone,
+  segmentArrivalZone,
+  segmentDepartureZone,
+  stayZone,
+  type TripPlan,
+  type TripSegment,
+} from "@/lib/trip-plan";
 import { stationLabel } from "@/lib/station-name";
 import { cn } from "@/lib/utils";
 
@@ -67,13 +75,17 @@ export function BookingChecklist({ tripId, plan, booked, onToggle, pending }: Pr
                 <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
                   {t("book.dayHeading", {
                     n: day.day,
-                    date: formatDay(day.departure, lang),
+                    date: formatDay(day.departure, lang, dayDepartureZone(day)),
                   })}
                 </p>
               ) : null}
 
               {day.segments.map((segment) => {
                 const isBooked = Boolean(booked[segment.key]);
+                // Snapshots saved before F5C carry only the old URLs; they keep
+                // rendering exactly as stored and are never rewritten.
+                const legacyActions = !segment.actions && !segment.bookability;
+                const actions = segment.actions ?? [];
                 return (
                   <div
                     key={segment.key}
@@ -93,7 +105,8 @@ export function BookingChecklist({ tripId, plan, booked, onToggle, pending }: Pr
                           </span>
                         </p>
                         <p className="mt-1 text-sm text-muted-foreground">
-                          {formatClock(segment.departure)} – {formatClock(segment.arrival)} ·{" "}
+                          {formatClock(segment.departure, segmentDepartureZone(segment))} –{" "}
+                          {formatClock(segment.arrival, segmentArrivalZone(segment))} ·{" "}
                           {formatDuration(segment.durationMinutes)}
                           {segment.operator ? ` · ${segment.operator}` : ""}
                         </p>
@@ -118,42 +131,74 @@ export function BookingChecklist({ tripId, plan, booked, onToggle, pending }: Pr
                       ) : null}
                     </div>
 
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <Button asChild size="sm" className="gap-1.5">
-                        <a
-                          href={segment.bookingUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={() => track(segment, "planner")}
-                        >
-                          {t("book.openTimes")}
-                          <ArrowUpRight className="size-4" />
-                        </a>
-                      </Button>
-                      {segment.operatorUrl && segment.operatorLabel ? (
-                        <Button asChild size="sm" variant="outline" className="gap-1.5">
-                          <a
-                            href={segment.operatorUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={() => track(segment, "operator")}
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      {legacyActions ? (
+                        <>
+                          {segment.bookingUrl ? (
+                            <Button asChild size="sm" className="gap-1.5">
+                              <a
+                                href={segment.bookingUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={() => track(segment, "planner")}
+                              >
+                                {t("book.openTimes")}
+                                <ArrowUpRight className="size-4" />
+                              </a>
+                            </Button>
+                          ) : null}
+                          {segment.operatorUrl && segment.operatorLabel ? (
+                            <Button asChild size="sm" variant="outline" className="gap-1.5">
+                              <a
+                                href={segment.operatorUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={() => track(segment, "operator")}
+                              >
+                                {t("book.atOperator", { operator: segment.operatorLabel })}
+                                <ArrowUpRight className="size-4" />
+                              </a>
+                            </Button>
+                          ) : null}
+                          {segment.retailerUrl ? (
+                            <Button asChild size="sm" variant="ghost" className="gap-1.5">
+                              <a
+                                href={segment.retailerUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={() => track(segment, "retailer")}
+                              >
+                                Trainline
+                                <ArrowUpRight className="size-4" />
+                              </a>
+                            </Button>
+                          ) : null}
+                        </>
+                      ) : segment.bookability === "local" ? (
+                        <p className="text-sm text-muted-foreground">{t("booking.local")}</p>
+                      ) : actions.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">{t("booking.none")}</p>
+                      ) : (
+                        actions.map((action, actionIndex) => (
+                          <Button
+                            key={`${action.target}-${action.url}`}
+                            asChild
+                            size="sm"
+                            variant={actionIndex === 0 ? "default" : "outline"}
+                            className="gap-1.5"
                           >
-                            {t("book.atOperator", { operator: segment.operatorLabel })}
-                            <ArrowUpRight className="size-4" />
-                          </a>
-                        </Button>
-                      ) : null}
-                      <Button asChild size="sm" variant="ghost" className="gap-1.5">
-                        <a
-                          href={segment.retailerUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={() => track(segment, "retailer")}
-                        >
-                          Trainline
-                          <ArrowUpRight className="size-4" />
-                        </a>
-                      </Button>
+                            <a
+                              href={action.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={() => track(segment, action.target)}
+                            >
+                              {t(bookingActionLabelKey(action), { operator: action.label })}
+                              <ArrowUpRight className="size-4" />
+                            </a>
+                          </Button>
+                        ))
+                      )}
                     </div>
                   </div>
                 );
@@ -164,8 +209,8 @@ export function BookingChecklist({ tripId, plan, booked, onToggle, pending }: Pr
                   <MoonStar className="size-4 text-primary" />
                   {t("book.nightIn", {
                     city: stay.city,
-                    arr: formatClock(stay.arrival),
-                    dep: formatClock(stay.departure),
+                    arr: formatClock(stay.arrival, stayZone(stay)),
+                    dep: formatClock(stay.departure, stayZone(stay)),
                   })}
                 </p>
               ) : null}

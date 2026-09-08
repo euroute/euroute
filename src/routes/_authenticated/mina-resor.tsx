@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { listMyTrips } from "@/lib/trips.functions";
 import { useI18n } from "@/lib/i18n";
 import { formatClock, formatDay, formatDayRange, formatDuration } from "@/lib/journey";
+import { FALLBACK_TIME_ZONE } from "@/lib/station-timezone";
 import { cityLabel } from "@/lib/station-name";
 
 export const Route = createFileRoute("/_authenticated/mina-resor")({
@@ -17,6 +18,8 @@ export const Route = createFileRoute("/_authenticated/mina-resor")({
       { name: "description", content: "Dina sparade tågreseplaner genom Europa." },
       { property: "og:title", content: "Mina resor – Euroute" },
       { property: "og:description", content: "Alla dina sparade tågreseplaner på ett ställe." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
       { name: "robots", content: "noindex, nofollow" },
     ],
   }),
@@ -36,11 +39,15 @@ function TripRow({ trip }: { trip: Trip }) {
   const multiDay = trip.travel_days > 1;
   const nights = trip.overnight_cities.length;
 
+  // Snapshot-recorded station zones; older rows fall back to the legacy zone.
+  const depZone = (trip as { depart_zone?: string | null }).depart_zone ?? FALLBACK_TIME_ZONE;
+  const arrZone = (trip as { arrive_zone?: string | null }).arrive_zone ?? depZone;
+
   const when = trip.depart_at
     ? multiDay && trip.arrive_at
-      ? formatDayRange(trip.depart_at, trip.arrive_at, lang)
-      : `${formatDay(trip.depart_at, lang)} · ${formatClock(trip.depart_at)}${
-          trip.arrive_at ? ` → ${formatClock(trip.arrive_at)}` : ""
+      ? formatDayRange(trip.depart_at, trip.arrive_at, lang, depZone, arrZone)
+      : `${formatDay(trip.depart_at, lang, depZone)} · ${formatClock(trip.depart_at, depZone)}${
+          trip.arrive_at ? ` → ${formatClock(trip.arrive_at, arrZone)}` : ""
         }${trip.duration_minutes ? ` · ${formatDuration(trip.duration_minutes)}` : ""}`
     : t("trips.noDate");
 

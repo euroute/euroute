@@ -6,9 +6,16 @@
  * Client-safe.
  */
 
-import { bookingTargetForLeg, operatorTargetForLeg, retailerTargetForLeg } from "./operators";
+import { bookingPlanForLeg, type BookingAction } from "./booking-actions";
+import { operatorTargetForLeg } from "./operators";
 import { formatDuration, type Journey, type Leg } from "./journey";
 import { type OvernightPlan } from "./overnight";
+import {
+  FALLBACK_TIME_ZONE,
+  journeyArrivalZone,
+  journeyDepartureZone,
+  zoneForPlace,
+} from "./station-timezone";
 import { cityLabel } from "./station-name";
 import type { JourneyOption, TravelStyle } from "./journey-intelligence";
 
@@ -31,9 +38,20 @@ export type TripSegment = {
   trainNames: string[];
   /** Number of trains inside the segment (a change without a new ticket). */
   legCount: number;
-  /** Pre-filled timetable/booking search for the whole segment. */
-  bookingUrl: string;
-  retailerUrl: string;
+  /** "lat,lon" of the boarding/alighting stops, for local-time rendering. */
+  fromPlace?: string | null;
+  toPlace?: string | null;
+  /**
+   * Legacy (pre-F5C) booking URLs. Kept optional so saved snapshots created
+   * before F5C keep rendering exactly as they were saved. New snapshots omit
+   * them and carry `actions` instead.
+   */
+  bookingUrl?: string | null;
+  retailerUrl?: string | null;
+  /** F5C: bookability class of the segment. Absent in legacy snapshots. */
+  bookability?: "rail" | "local";
+  /** F5C: reliable booking actions, in presentation order. */
+  actions?: BookingAction[];
 };
 
 export type TripDay = {
@@ -51,6 +69,8 @@ export type TripDay = {
 export type TripStay = {
   city: string;
   station: string;
+  /** "lat,lon" of the stay station, for local-time rendering. */
+  place?: string | null;
   arrival: string;
   departure: string;
   nights: number;
@@ -69,6 +89,9 @@ export type TripPlan = {
   changes: number;
   travelDays: number;
   isOvernight: boolean;
+  /** IANA zones of the first departure and final arrival station (display). */
+  departZone?: string;
+  arriveZone?: string;
   style: TravelStyle;
   score: number | null;
   minTransferMinutes: number;
@@ -109,6 +132,7 @@ export function segmentsForDay(journey: Journey, day: number): TripSegment[] {
   return legs.map((leg, index) => {
     const merged = mergeLegs([leg]);
     const operatorTarget = operatorTargetForLeg(merged);
+    const plan = bookingPlanForLeg(merged);
     return {
       key: `d${day}s${index + 1}`,
       day,
@@ -122,9 +146,11 @@ export function segmentsForDay(journey: Journey, day: number): TripSegment[] {
       operatorUrl: operatorTarget?.url ?? null,
       modeLabel: merged.modeLabel,
       trainNames: [merged.trainName ?? merged.modeLabel].filter(Boolean),
+      fromPlace: merged.fromPlace ?? null,
+      toPlace: merged.toPlace ?? null,
       legCount: 1,
-      bookingUrl: bookingTargetForLeg(merged).url,
-      retailerUrl: retailerTargetForLeg(merged).url,
+      bookability: plan.kind,
+      actions: plan.actions,
     };
   });
 }
@@ -170,6 +196,8 @@ export function tripPlanFromOption(args: {
     changes: day.changes,
     travelDays: 1,
     isOvernight: false,
+    departZone: journeyDepartureZone(option.journey),
+    arriveZone: journeyArrivalZone(option.journey),
     style: args.style,
     score: option.score,
     minTransferMinutes: args.minTransferMinutes,
@@ -201,6 +229,8 @@ export function tripPlanFromOvernight(args: {
     changes: args.plan.changes,
     travelDays: days.length,
     isOvernight: true,
+    departZone: journeyDepartureZone(firstDay.journey),
+    arriveZone: journeyArrivalZone(lastDay.journey),
     style: args.style,
     score: args.score ?? null,
     minTransferMinutes: args.minTransferMinutes,
@@ -208,6 +238,7 @@ export function tripPlanFromOvernight(args: {
     stays: args.plan.stays.map((stay) => ({
       city: cityLabel(stay.station),
       station: stay.station,
+      place: stay.place ?? null,
       arrival: stay.arrival,
       departure: stay.departure,
       nights: stay.nights,
@@ -226,4 +257,42 @@ export function planTitle(plan: TripPlan): string {
 
 export function planDurationLabel(plan: TripPlan): string {
   return formatDuration(plan.durationMinutes);
+}
+
+/* ------------------------------------------------------------------ *
+ * Display timezones
+ * ------------------------------------------------------------------ *
+ * Snapshots keep absolute instants; these helpers only say which local
+ * clock each instant should be rendered in. Older snapshots without
+ * coordinates fall back to the project's previous single zone.
+ */
+
+export function dayDepartureZone(day: TripDay): string {
+  return journeyDepartureZone(day.journey);
+}
+
+export function dayArrivalZone(day: TripDay): string {
+  return journeyArrivalZone(day.journey);
+}
+
+export function segmentDepartureZone(segment: TripSegment): string {
+  return zoneForPlace(segment.fromPlace);
+}
+
+export function segmentArrivalZone(segment: TripSegment): string {
+  return zoneForPlace(segment.toPlace);
+}
+
+export function stayZone(stay: TripStay): string {
+  return zoneForPlace(stay.place);
+}
+
+export function planDepartureZone(plan: TripPlan): string {
+  const day = plan.days[0];
+  return plan.departZone ?? (day ? dayDepartureZone(day) : FALLBACK_TIME_ZONE);
+}
+
+export function planArrivalZone(plan: TripPlan): string {
+  const day = plan.days[plan.days.length - 1];
+  return plan.arriveZone ?? (day ? dayArrivalZone(day) : FALLBACK_TIME_ZONE);
 }

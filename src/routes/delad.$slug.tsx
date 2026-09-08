@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
 import { formatClock, formatDay, formatDuration } from "@/lib/journey";
+import { dayDepartureZone, planDepartureZone, stayZone } from "@/lib/trip-plan";
+import { FALLBACK_TIME_ZONE } from "@/lib/station-timezone";
 import { cityLabel } from "@/lib/station-name";
 import { getSharedTrip } from "@/lib/trips.functions";
 import type { TripPlan } from "@/lib/trip-plan";
@@ -63,6 +65,7 @@ function SharedTrip() {
 
   const plan: TripPlan | null = trip.itinerary ?? null;
   const isPlan = Boolean(plan && Array.isArray(plan.days) && plan.days.length > 0);
+  const depZone = isPlan && plan ? planDepartureZone(plan) : FALLBACK_TIME_ZONE;
 
   return (
     <div className="min-h-screen bg-background">
@@ -74,8 +77,8 @@ function SharedTrip() {
           {cityLabel(trip.to_name)}
         </h1>
         <p className="mt-1.5 text-sm text-muted-foreground">
-          {trip.depart_at ? formatDay(trip.depart_at, lang) : t("trips.noDate")}
-          {trip.depart_at ? ` · ${formatClock(trip.depart_at)}` : ""}
+          {trip.depart_at ? formatDay(trip.depart_at, lang, depZone) : t("trips.noDate")}
+          {trip.depart_at ? ` · ${formatClock(trip.depart_at, depZone)}` : ""}
           {isPlan && plan && plan.travelDays === 1
             ? ` · ${formatDuration(plan.durationMinutes)}`
             : ""}
@@ -96,7 +99,10 @@ function SharedTrip() {
                   <div key={`shared-day-${day.day}`} className="space-y-3">
                     {plan.days.length > 1 ? (
                       <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                        {t("book.dayHeading", { n: day.day, date: formatDay(day.departure, lang) })}
+                        {t("book.dayHeading", {
+                          n: day.day,
+                          date: formatDay(day.departure, lang, dayDepartureZone(day)),
+                        })}
                       </p>
                     ) : null}
                     <JourneyCard journey={day.journey} minTransferMinutes={plan.minTransferMinutes} />
@@ -105,8 +111,8 @@ function SharedTrip() {
                         <MoonStar className="size-4 text-primary" />
                         {t("book.nightIn", {
                           city: stay.city,
-                          arr: formatClock(stay.arrival),
-                          dep: formatClock(stay.departure),
+                          arr: formatClock(stay.arrival, stayZone(stay)),
+                          dep: formatClock(stay.departure, stayZone(stay)),
                         })}
                       </p>
                     ) : null}

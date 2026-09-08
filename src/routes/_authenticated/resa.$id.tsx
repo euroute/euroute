@@ -12,6 +12,13 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useI18n } from "@/lib/i18n";
 import { formatClock, formatDay, formatDayRange, formatDuration } from "@/lib/journey";
+import {
+  dayDepartureZone,
+  planArrivalZone,
+  planDepartureZone,
+  stayZone,
+} from "@/lib/trip-plan";
+import { FALLBACK_TIME_ZONE } from "@/lib/station-timezone";
 import { cityLabel } from "@/lib/station-name";
 import {
   deleteTrip,
@@ -35,6 +42,8 @@ export const Route = createFileRoute("/_authenticated/resa/$id")({
         property: "og:description",
         content: "Din sparade tågresa genom Europa med alla etapper och bokningslänkar.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
       { name: "robots", content: "noindex, nofollow" },
     ],
   }),
@@ -55,6 +64,9 @@ function TripDetail() {
   const row = trip.data?.trip ?? null;
   const plan = (row?.itinerary ?? null) as TripPlan | null;
   const isPlan = Boolean(plan && Array.isArray(plan.days) && plan.days.length > 0);
+  // Header clocks belong to the first/last station of the snapshot itinerary.
+  const depZone = isPlan && plan ? planDepartureZone(plan) : FALLBACK_TIME_ZONE;
+  const arrZone = isPlan && plan ? planArrivalZone(plan) : FALLBACK_TIME_ZONE;
 
   const booked = useMemo(() => {
     const map: Record<string, boolean> = {};
@@ -148,9 +160,9 @@ function TripDetail() {
           <p className="mt-1.5 text-sm text-muted-foreground">
             {row.depart_at
               ? row.travel_days > 1 && row.arrive_at
-                ? formatDayRange(row.depart_at, row.arrive_at, lang)
-                : `${formatDay(row.depart_at, lang)} · ${formatClock(row.depart_at)}${
-                    row.arrive_at ? ` → ${formatClock(row.arrive_at)}` : ""
+                ? formatDayRange(row.depart_at, row.arrive_at, lang, depZone, arrZone)
+                : `${formatDay(row.depart_at, lang, depZone)} · ${formatClock(row.depart_at, depZone)}${
+                    row.arrive_at ? ` → ${formatClock(row.arrive_at, arrZone)}` : ""
                   }${row.duration_minutes ? ` · ${formatDuration(row.duration_minutes)}` : ""}`
               : t("trips.noDate")}
           </p>
@@ -233,7 +245,10 @@ function TripDetail() {
                 <div key={`day-${day.day}`} className="space-y-3">
                   {plan.days.length > 1 ? (
                     <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                      {t("book.dayHeading", { n: day.day, date: formatDay(day.departure, lang) })}
+                      {t("book.dayHeading", {
+                        n: day.day,
+                        date: formatDay(day.departure, lang, dayDepartureZone(day)),
+                      })}
                     </p>
                   ) : null}
                   <JourneyCard
@@ -245,8 +260,8 @@ function TripDetail() {
                       <MoonStar className="size-4 text-primary" />
                       {t("book.nightIn", {
                         city: stay.city,
-                        arr: formatClock(stay.arrival),
-                        dep: formatClock(stay.departure),
+                        arr: formatClock(stay.arrival, stayZone(stay)),
+                        dep: formatClock(stay.departure, stayZone(stay)),
                       })}
                     </p>
                   ) : null}

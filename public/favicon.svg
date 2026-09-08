@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Euroute symbol</title>
+  <desc id="desc">Dark green rounded square with a white branching railway track symbol.</desc>
+
+  <rect x="24" y="24" width="976" height="976" rx="170" fill="#0E5A46"/>
+
+  <g fill="none" stroke="#FFFFFF" stroke-width="34" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M292 184 L292 846"/>
+    <path d="M548 184 L548 846"/>
+
+    <path d="M248 244 H584"/>
+    <path d="M248 324 H584"/>
+    <path d="M248 404 H584"/>
+    <path d="M248 484 H584"/>
+    <path d="M248 564 H584"/>
+    <path d="M248 644 H584"/>
+    <path d="M248 724 H584"/>
+    <path d="M248 804 H584"/>
+
+    <path d="M640 184
+             C640 270 632 334 592 382
+             C554 428 504 462 468 500
+             C426 544 410 596 408 652
+             C404 734 408 792 408 846"/>
+
+    <path d="M666 244 H804"/>
+    <path d="M660 324 H804"/>
+    <path d="M640 404 H790"/>
+    <path d="M604 484 H758"/>
+    <path d="M560 564 H706"/>
+
+    <path d="M292 652
+             C316 584 354 528 404 486
+             C452 446 506 420 548 382"/>
+  </g>
+</svg>

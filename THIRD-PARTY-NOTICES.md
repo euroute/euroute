@@ -136,3 +136,26 @@ responsible for complying with the terms of every data source they use.
 Components under `src/components/ui` are derived from
 [shadcn/ui](https://ui.shadcn.com), MIT licensed, copied into this repository as
 source and modified for Euroute.
+
+## Bundled MOTIS API specification
+
+`openapi.yaml` in the repository root is the OpenAPI specification of the
+[MOTIS](https://github.com/motis-project/motis) routing API — the API served by
+Transitous — vendored unmodified for reference. It is **not** imported by
+application code.
+
+- Source: the MOTIS project, <https://github.com/motis-project/motis>
+- Licence: MIT, as declared in the specification's own `info.license` field
+  (`name: MIT`, `url: https://opensource.org/license/mit`)
+- Copyright: the MOTIS project and its contributors
+
+MIT permits redistribution inside this AGPL-3.0-only repository provided the
+copyright and permission notice is preserved. The licence declaration inside
+`openapi.yaml` is kept intact; do not strip it when updating the file.
+
+## Verification note
+
+The direct dependency list in `package.json` was re-checked against this file
+before public release. `bun.lock` is the canonical lockfile; the licence data
+above reflects the packages it resolves.
+

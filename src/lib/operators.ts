@@ -18,6 +18,7 @@
 // globalt operatörs-ID.
 
 import type { Leg } from "./journey";
+import { legDepartureZone } from "./station-timezone";
 
 type OperatorConfig = {
   label: string;
@@ -44,19 +45,31 @@ const slug = (s: string) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
 
-/** ISO-tid (utan sekunder) i Europe/Berlin, formatet DB:s planerare vill ha. */
-function berlinLocalIso(iso: string): string {
+/**
+ * ISO-tid (utan sekunder) uttryckt i etappens EGNA lokala civiltid – det format
+ * DB:s europeiska planerare vill ha, och exakt den klocka Euroute visar.
+ *
+ * Tidigare räknades tiden om till Europe/Berlin, vilket flyttade avgången med
+ * ±1–2 timmar för etapper utanför centraleuropeisk tid (London, Lissabon,
+ * Athen). En bokningslänk måste peka på samma tåg som reseplanen visar, så
+ * zonen hämtas generiskt från etappens påstigningsstation – samma
+ * koordinatbaserade uppslag som klockan i gränssnittet använder. Inga
+ * land-, operatörs- eller stationsundantag.
+ */
+function legLocalDepartureIso(leg: Leg): string {
   const fmt = new Intl.DateTimeFormat("sv-SE", {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
-    timeZone: "Europe/Berlin",
-  }).formatToParts(new Date(iso));
+    hourCycle: "h23",
+    timeZone: legDepartureZone(leg),
+  }).formatToParts(new Date(leg.departure));
   const get = (t: string) => fmt.find((p) => p.type === t)?.value ?? "";
   return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}:00`;
 }
+
 
 /** Bolagsformer som aldrig ska påverka identifieringen. */
 const LEGAL_SUFFIXES = new Set([
@@ -291,7 +304,7 @@ export function findOperator(operator: string | undefined): OperatorConfig | und
 export function bookingTargetForLeg(leg: Leg): BookingTarget {
   const from = cleanName(leg.fromName);
   const to = cleanName(leg.toName);
-  const hd = berlinLocalIso(leg.departure);
+  const hd = legLocalDepartureIso(leg);
   const url = `https://int.bahn.de/en/buchung/fahrplan/suche#sts=true&so=${e(from)}&zo=${e(to)}&hd=${e(hd)}&kl=2&r=13:16:KLASSENLOS:1&soid=A%3D1%40O%3D${e(from)}&zoid=A%3D1%40O%3D${e(to)}`;
   return {
     label: "Se tider & boka etappen",

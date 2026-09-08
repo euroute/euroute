@@ -31,4 +31,4 @@ Disallow: /konto
 Disallow: /delad/
 Disallow: /auth
 
-Sitemap: https://euroute.lovable.app/sitemap.xml
+Sitemap: https://euroute.app/sitemap.xml
